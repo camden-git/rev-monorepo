@@ -1,0 +1,59 @@
+import CoreLocation
+import MapKit
+import SwiftyH3
+
+/// helpers over SwiftyH3 for the map slice
+enum H3Grid {
+    static let resolution: H3Cell.Resolution = .res10
+
+    /// an approximation of res-10 hexagon edge length in meters
+    static let edgeMeters: Double = 65
+
+    /// below this many cellsthe grid is drawn
+    static let maxGridCells = 1800
+
+    /// the res-10 cell containing a coordinate, nil if conversion fails
+    static func cell(for coordinate: CLLocationCoordinate2D) -> H3Cell? {
+        try? H3LatLng(coordinate).cell(at: resolution)
+    }
+
+    /// res-10 cells covering (roughly) the visible region: the center cell expanded by a grid
+    /// disk whose radius is derived from the region's diagonal reach
+    /// returns [] when zoomed out past the cell cap
+    static func coveringCells(for region: MKCoordinateRegion) -> [H3Cell] {
+        guard let center = cell(for: region.center) else { return [] }
+
+        // meters, north-south and east-west
+        let latMeters = region.span.latitudeDelta * 111_320
+        let lngMeters = region.span.longitudeDelta * 111_320
+            * cos(region.center.latitude * .pi / 180)
+        let halfDiagonal = hypot(latMeters, lngMeters) / 2
+
+        // each disk ring step covers ~one hex edge of additional reach
+        let radius = Int32((halfDiagonal / edgeMeters).rounded(.up))
+        guard radius >= 1 else { return [center] }
+
+        // cells in a grid disk of radius k is 3k(k+1)+1
+        let estimated = 3 * Int(radius) * (Int(radius) + 1) + 1
+        guard estimated <= maxGridCells else { return [] }
+
+        return (try? center.gridDisk(distance: radius)) ?? [center]
+    }
+
+    /// outline per hex
+    static func gridOverlay(for cells: [H3Cell]) -> MKMultiPolygon {
+        let polygons = cells.compactMap { cell -> MKPolygon? in
+            guard let loop = try? cell.boundary else { return nil }
+            return MKPolygon(loop)
+        }
+        return MKMultiPolygon(polygons)
+    }
+
+    /// claimed cells merged into a single merged territory outline
+    static func claimedOverlay(for cellIndices: Set<UInt64>) -> MKMultiPolygon? {
+        guard !cellIndices.isEmpty else { return nil }
+        let cells = cellIndices.map { H3Cell($0) }
+        guard let merged = try? cells.multiPolygon else { return nil }
+        return MKMultiPolygon(from: merged)
+    }
+}

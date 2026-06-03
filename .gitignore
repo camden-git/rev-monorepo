@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# xcode
+build/
+DerivedData/
+*.xcuserdata
+*.xcuserdatad
+xcuserdata/
+*.xcworkspace/xcuserdata/
+.swiftpm/
+Package.resolved.local
+
+# swift
+.build/
+
+# golang
+backend/bin/
+backend/mapthing-api
+*.exe
+
+# pb
+backend/pb_data/*
+!backend/pb_data/.gitkeep
+
+# envs
+.env
+.env.local
+.env.*.local
+
+# jetbrains
+.idea/
+*.iml
+
+# logs
+*.log
+
+# extras
+*.sql.gz
