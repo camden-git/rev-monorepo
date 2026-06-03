@@ -7,81 +7,83 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		268839E8A9FECD6CB05E3AD0 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 292C1B731C299E67A349D3CD /* RootView.swift */; };
-		619DA5C1A8096D69252D8BE3 /* RevApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F596F24BC7A345EF2091FD7 /* RevApp.swift */; };
-		A005FDDC5A4FA61A6A37438E /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = 984287AEEFB22CCCFB395C2F /* RevKit */; };
+		119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A612DB066C3D529986584A8B /* RevApp.swift */; };
+		9422689350B941F2325CCDA5 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76981DF5A715E1D4AC6D1 /* RootView.swift */; };
+		BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9B7B4275284769A91EF50C5 /* RevKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		292C1B731C299E67A349D3CD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		6B2D8225E5425160E315AA70 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RevKit; path = RevKit; sourceTree = SOURCE_ROOT; };
-		7F596F24BC7A345EF2091FD7 /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
-		CFBB18A055BAE928BA7F4C5F /* Rev.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		32B76981DF5A715E1D4AC6D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RevKit; path = RevKit; sourceTree = SOURCE_ROOT; };
+		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		3728BBD614D0226B96BE284C /* Frameworks */ = {
+		0ACBCA3F217932BA1475B516 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A005FDDC5A4FA61A6A37438E /* RevKit in Frameworks */,
+				BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2A88089CB450CACE9CB9B915 = {
+		67C259D607CD7F162B12DE16 /* Rev */ = {
 			isa = PBXGroup;
 			children = (
-				F0EAB0094CD9CCB9CE6CA029 /* Rev */,
-				CF0D8FE25D44CB31D3A811F2 /* Packages */,
-				C1FF94D03450C1FE468CC16A /* Products */,
+				91A4895964A768B703C46392 /* Info.plist */,
+				B1B3B3DF4CE62CE68F89C3C4 /* App */,
 			);
+			path = Rev;
 			sourceTree = "<group>";
 		};
-		92AF6C1397B489F86D95B749 /* App */ = {
+		71FA7C28AE8D30D4F8AAF814 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				7F596F24BC7A345EF2091FD7 /* RevApp.swift */,
-				292C1B731C299E67A349D3CD /* RootView.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
-		C1FF94D03450C1FE468CC16A /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				CFBB18A055BAE928BA7F4C5F /* Rev.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		CF0D8FE25D44CB31D3A811F2 /* Packages */ = {
-			isa = PBXGroup;
-			children = (
-				6B2D8225E5425160E315AA70 /* RevKit */,
+				96C64F7A6F30957F0653F624 /* RevKit */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
 		};
-		F0EAB0094CD9CCB9CE6CA029 /* Rev */ = {
+		7232386AC9B9B6FFF0843CC7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				92AF6C1397B489F86D95B749 /* App */,
+				A14A42EEDF08D006B0DAD8C1 /* Rev.app */,
 			);
-			path = Rev;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B1B3B3DF4CE62CE68F89C3C4 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A612DB066C3D529986584A8B /* RevApp.swift */,
+				32B76981DF5A715E1D4AC6D1 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		B70B2AEF25D0AE17A0127E4F = {
+			isa = PBXGroup;
+			children = (
+				71FA7C28AE8D30D4F8AAF814 /* Packages */,
+				67C259D607CD7F162B12DE16 /* Rev */,
+				7232386AC9B9B6FFF0843CC7 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		DC6717816B83C1BE95188EA0 /* Rev */ = {
+		6DB0851F2343469158CF0ECF /* Rev */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 733865B2C25097AA65A980AC /* Build configuration list for PBXNativeTarget "Rev" */;
+			buildConfigurationList = 86EE6FE616F6F374793C7873 /* Build configuration list for PBXNativeTarget "Rev" */;
 			buildPhases = (
-				86AF68EBE7DE393BC0C02FC4 /* Sources */,
-				3728BBD614D0226B96BE284C /* Frameworks */,
+				99D2D0C09048D0742EB6B6EB /* Sources */,
+				0ACBCA3F217932BA1475B516 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -89,62 +91,62 @@
 			);
 			name = Rev;
 			packageProductDependencies = (
-				984287AEEFB22CCCFB395C2F /* RevKit */,
+				D9B7B4275284769A91EF50C5 /* RevKit */,
 			);
 			productName = Rev;
-			productReference = CFBB18A055BAE928BA7F4C5F /* Rev.app */;
+			productReference = A14A42EEDF08D006B0DAD8C1 /* Rev.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		6B85D9A6DABEB67A63771796 /* Project object */ = {
+		C9DC64E27AD1B0C067701727 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					DC6717816B83C1BE95188EA0 = {
+					6DB0851F2343469158CF0ECF = {
 						DevelopmentTeam = "";
 					};
 				};
 			};
-			buildConfigurationList = B8B329B0EDB52970913E579C /* Build configuration list for PBXProject "Rev" */;
+			buildConfigurationList = E5AAED5AF29484A42097BAAF /* Build configuration list for PBXProject "Rev" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 2A88089CB450CACE9CB9B915;
+			mainGroup = B70B2AEF25D0AE17A0127E4F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				E9D057456FD48A49789AED1E /* XCLocalSwiftPackageReference "RevKit" */,
+				FE28793762A7F2768A6D8040 /* XCLocalSwiftPackageReference "RevKit" */,
 			);
 			preferredProjectObjectVersion = 77;
-			productRefGroup = C1FF94D03450C1FE468CC16A /* Products */;
+			productRefGroup = 7232386AC9B9B6FFF0843CC7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				DC6717816B83C1BE95188EA0 /* Rev */,
+				6DB0851F2343469158CF0ECF /* Rev */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-		86AF68EBE7DE393BC0C02FC4 /* Sources */ = {
+		99D2D0C09048D0742EB6B6EB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				619DA5C1A8096D69252D8BE3 /* RevApp.swift in Sources */,
-				268839E8A9FECD6CB05E3AD0 /* RootView.swift in Sources */,
+				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,
+				9422689350B941F2325CCDA5 /* RootView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		03824A727F1598EB175A8631 /* Release */ = {
+		0F6DDB95F2812D4F55FC2A7E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -203,28 +205,7 @@
 			};
 			name = Release;
 		};
-		0941E9A50FA254D5BBAF6D25 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Rev;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rev shows your position on the map.";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = app.driverev.Rev;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Debug;
-		};
-		417FBF2D641893BB84239783 /* Debug */ = {
+		42775D9C19CFD45F2FD976A5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -290,14 +271,41 @@
 			};
 			name = Debug;
 		};
-		7470336727A2F61069203061 /* Release */ = {
+		74FC198813A85BCE244158D5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rev shows your position on the map.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Rev tracks your movement in the background to claim territory as you drive, bike, or walk.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rev records your drives to claim territory on the map.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Rev uses motion activity to start and stop drive recording automatically and save battery.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.driverev.Rev;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		DE8F2FEDA0B9B6B5C0CE2678 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Rev/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Rev;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Rev tracks your movement in the background to claim territory as you drive, bike, or walk.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rev records your drives to claim territory on the map.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "Rev uses motion activity to start and stop drive recording automatically and save battery.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -314,20 +322,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		733865B2C25097AA65A980AC /* Build configuration list for PBXNativeTarget "Rev" */ = {
+		86EE6FE616F6F374793C7873 /* Build configuration list for PBXNativeTarget "Rev" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				0941E9A50FA254D5BBAF6D25 /* Debug */,
-				7470336727A2F61069203061 /* Release */,
+				74FC198813A85BCE244158D5 /* Debug */,
+				DE8F2FEDA0B9B6B5C0CE2678 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		B8B329B0EDB52970913E579C /* Build configuration list for PBXProject "Rev" */ = {
+		E5AAED5AF29484A42097BAAF /* Build configuration list for PBXProject "Rev" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				417FBF2D641893BB84239783 /* Debug */,
-				03824A727F1598EB175A8631 /* Release */,
+				42775D9C19CFD45F2FD976A5 /* Debug */,
+				0F6DDB95F2812D4F55FC2A7E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -335,18 +343,18 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		E9D057456FD48A49789AED1E /* XCLocalSwiftPackageReference "RevKit" */ = {
+		FE28793762A7F2768A6D8040 /* XCLocalSwiftPackageReference "RevKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = RevKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		984287AEEFB22CCCFB395C2F /* RevKit */ = {
+		D9B7B4275284769A91EF50C5 /* RevKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RevKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = 6B85D9A6DABEB67A63771796 /* Project object */;
+	rootObject = C9DC64E27AD1B0C067701727 /* Project object */;
 }

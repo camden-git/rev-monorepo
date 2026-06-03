@@ -1,0 +1,28 @@
+{
+  "configurations" : [
+    {
+      "id" : "E105F6C6-2898-4D73-9D39-7EA03E3CE820",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Rev.xcodeproj",
+      "identifier" : "Rev",
+      "name" : "Rev"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:RevKit",
+        "identifier" : "RevKitTests",
+        "name" : "RevKitTests"
+      }
+    }
+  ],
+  "version" : 1
+}

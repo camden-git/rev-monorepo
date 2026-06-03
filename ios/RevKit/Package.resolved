@@ -1,0 +1,24 @@
+{
+  "originHash" : "867c90121858091956065202811258969aae1466f4b482e25438073ff1c94232",
+  "pins" : [
+    {
+      "identity" : "ch3",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pawelmajcher/Ch3.git",
+      "state" : {
+        "revision" : "defe61b18c4f5fc024a3ff6bd5b6c3a9562f5e09",
+        "version" : "4.3.0"
+      }
+    },
+    {
+      "identity" : "swiftyh3",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pawelmajcher/SwiftyH3.git",
+      "state" : {
+        "revision" : "2dab6f4cc8b7aff475ef9b76ff9e9e7b7fd551ec",
+        "version" : "0.4.1"
+      }
+    }
+  ],
+  "version" : 3
+}

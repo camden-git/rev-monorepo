@@ -1,20 +1,28 @@
 import Observation
 
-/// an n-memory, single-player territory state for the local-only slice
-/// holds the set of claimed H3 cell indices
-/// at some point this should be using SwiftData but ill deal w/ that later
+/// in-memory, single-player territory state for the local-only slice. maps each owned H3 cell to
+/// its claim score (mph)
+///
+/// SwiftData will go here soon REF: docs/tech-stack.md §Local Storage
 @MainActor
 @Observable
 public final class TerritoryStore {
-    public private(set) var claimedCells: Set<UInt64> = []
+    /// owned cells -> claim score (mph) current assumption is single player so every key is ours
+    public private(set) var tiles: [UInt64: Double] = [:]
+
+    public var claimedCells: Set<UInt64> { Set(tiles.keys) }
 
     public init() {}
 
-    public func claim(_ cellIndex: UInt64) {
-        claimedCells.insert(cellIndex)
+    /// claim a cell for the local player
+    ///
+    /// changes will be neeeded here to enforce game rules
+    /// REF: docs/game-design.md §Claiming Territory
+    public func claim(_ cellIndex: UInt64, score: Double = 0) {
+        tiles[cellIndex] = max(tiles[cellIndex] ?? 0, score)
     }
 
     public func isClaimed(_ cellIndex: UInt64) -> Bool {
-        claimedCells.contains(cellIndex)
+        tiles[cellIndex] != nil
     }
 }

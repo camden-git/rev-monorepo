@@ -32,5 +32,26 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Rev
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: true
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Rev shows your position on the map"
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Rev records your drives to claim territory on the map."
+        INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription: "Rev tracks your movement in the background to claim territory as you drive, bike, or walk."
+        INFOPLIST_KEY_NSMotionUsageDescription: "Rev uses motion activity to start and stop drive recording automatically and save battery."
+        INFOPLIST_FILE: Rev/Info.plist
         TARGETED_DEVICE_FAMILY: "1"
+
+schemes:
+  Rev:
+    build:
+      targets:
+        Rev: all
+    test:
+      testPlans:
+        - path: Rev.xctestplan
+          defaultPlan: true
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

@@ -1,12 +1,16 @@
+#if canImport(UIKit)
 import MapKit
 import SwiftUI
 
-/// MapKit map with an H3 res-10 grid overlay and tap-to-claim
+/// MapKit map with an H3 res-10 grid overlay, the live claimed-territory fill, and an optional
+/// breadcrumb of the in-progress drive. tap-to-claim remains as a debug input and needs to be removed later
 public struct HexMapView: UIViewRepresentable {
     private let store: TerritoryStore
+    private let breadcrumb: [CLLocationCoordinate2D]
 
-    public init(store: TerritoryStore) {
+    public init(store: TerritoryStore, breadcrumb: [CLLocationCoordinate2D] = []) {
         self.store = store
+        self.breadcrumb = breadcrumb
     }
 
     public func makeCoordinator() -> Coordinator {
@@ -39,6 +43,7 @@ public struct HexMapView: UIViewRepresentable {
 
     public func updateUIView(_ mapView: MKMapView, context: Context) {
         context.coordinator.syncClaimedOverlay()
+        context.coordinator.syncBreadcrumb(breadcrumb)
     }
 
     public final class Coordinator: NSObject, MKMapViewDelegate {
@@ -47,6 +52,7 @@ public struct HexMapView: UIViewRepresentable {
 
         private var gridOverlay: MKMultiPolygon?
         private var claimedOverlay: MKMultiPolygon?
+        private var breadcrumbOverlay: MKPolyline?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
 
@@ -76,6 +82,18 @@ public struct HexMapView: UIViewRepresentable {
             } else {
                 claimedOverlay = nil
             }
+        }
+
+        func syncBreadcrumb(_ coordinates: [CLLocationCoordinate2D]) {
+            guard let mapView else { return }
+            if let breadcrumbOverlay { mapView.removeOverlay(breadcrumbOverlay) }
+            guard coordinates.count > 1 else {
+                breadcrumbOverlay = nil
+                return
+            }
+            let line = MKPolyline(coordinates: coordinates, count: coordinates.count)
+            breadcrumbOverlay = line
+            mapView.addOverlay(line)
         }
 
         public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
@@ -109,6 +127,12 @@ public struct HexMapView: UIViewRepresentable {
         // MARK: rendering
 
         public func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = UIColor.systemOrange
+                renderer.lineWidth = 3
+                return renderer
+            }
             guard let multiPolygon = overlay as? MKMultiPolygon else {
                 return MKOverlayRenderer(overlay: overlay)
             }
@@ -126,3 +150,4 @@ public struct HexMapView: UIViewRepresentable {
         }
     }
 }
+#endif

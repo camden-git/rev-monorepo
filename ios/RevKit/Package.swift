@@ -3,7 +3,8 @@ import PackageDescription
 
 let package = Package(
     name: "RevKit",
-    platforms: [.iOS(.v17)],
+    // macOS is only supported so the pure game-math functions can be unit-tested on the host
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "RevKit", targets: ["RevKit"]),
     ],
@@ -14,6 +15,10 @@ let package = Package(
         .target(
             name: "RevKit",
             dependencies: ["SwiftyH3"]
+        ),
+        .testTarget(
+            name: "RevKitTests",
+            dependencies: ["RevKit"]
         ),
     ]
 )
