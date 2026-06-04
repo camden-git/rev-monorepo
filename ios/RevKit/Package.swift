@@ -18,7 +18,7 @@ let package = Package(
         ),
         .testTarget(
             name: "RevKitTests",
-            dependencies: ["RevKit"]
+            dependencies: ["RevKit", "SwiftyH3"]
         ),
     ]
 )

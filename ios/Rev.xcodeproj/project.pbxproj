@@ -15,9 +15,10 @@
 /* Begin PBXFileReference section */
 		32B76981DF5A715E1D4AC6D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RevKit; path = RevKit; sourceTree = SOURCE_ROOT; };
+		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
 		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
+		E94D0C0E2FD1057D00D6E18B /* chicago-loop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-loop.gpx"; path = "../scripts/chicago-loop.gpx"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,6 +70,7 @@
 		B70B2AEF25D0AE17A0127E4F = {
 			isa = PBXGroup;
 			children = (
+				E94D0C0E2FD1057D00D6E18B /* chicago-loop.gpx */,
 				71FA7C28AE8D30D4F8AAF814 /* Packages */,
 				67C259D607CD7F162B12DE16 /* Rev */,
 				7232386AC9B9B6FFF0843CC7 /* Products */,

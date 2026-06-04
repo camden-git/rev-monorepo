@@ -34,6 +34,12 @@ public final class DriveTracker {
 
     private var isMoving = false
     private var stationaryDropTask: Task<Void, Never>?
+
+    /// live enclosure-closure tracking, reset per drive
+    private var visitedTiles: Set<UInt64> = []
+    private var ownedAtDriveStart: Set<UInt64> = []
+    private var hasLeftOwned = false
+    private var lastTile: UInt64?
     /// how long activity must read stationary before we drop back to significant-change
     private let stationaryGrace: Duration = .seconds(60)
 
@@ -134,6 +140,10 @@ public final class DriveTracker {
         guard currentDrive == nil else { return }
         currentDrive = Drive(startedAt: Date())
         isRecording = true
+        visitedTiles = []
+        ownedAtDriveStart = store.claimedCells
+        hasLeftOwned = false
+        lastTile = nil
     }
 
     fileprivate func ingest(_ locations: [CLLocation]) {
@@ -150,8 +160,57 @@ public final class DriveTracker {
             currentSpeedMph = max(location.speed, 0) * TileScoring.mphPerMetersPerSecond
 
             if let tile = TileScoring.cell(lat: sample.lat, lng: sample.lng) {
+                if tile != lastTile {
+                    let ownedAtStart = ownedAtDriveStart.contains(tile)
+                    // closing the loop = touching a cell we've already crossed this drive, or
+                    // reentering territory we owned when the drive began
+                    if visitedTiles.contains(tile) || (hasLeftOwned && ownedAtStart) {
+                        captureEnclosureIfClosed(now: sample.timestamp)
+                    }
+                    if !ownedAtStart { hasLeftOwned = true }
+                    visitedTiles.insert(tile)
+                    lastTile = tile
+                }
                 store.claim(tile)
             }
+        }
+
+        // re-score every crossed tile off the drive so far
+        applyPerTileScores()
+    }
+
+    /// (re)compute and apply the per-tile distance-weighted scores for the drive so far. used both
+    /// live (each ingest) and at finalize. a tile's score stabilizes once you leave it, so the
+    /// re-drive floor in `store.claim` keeps the right value
+    @discardableResult
+    private func applyPerTileScores() -> [UInt64: Double] {
+        guard let drive = currentDrive else { return [:] }
+        let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
+        let scores = TileScoring.perTileScores(for: cleaned)
+        for (tile, score) in scores {
+            store.claim(tile, score: score)
+        }
+        return scores
+    }
+
+    /// the second a loop closes, score + claim its interior (REF: docs/game-design.md
+    /// §Trails & Enclosure)
+    private func captureEnclosureIfClosed(now: Date) {
+        guard let drive = currentDrive else { return }
+        let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
+        let crossed = TileScoring.tilesCrossed(for: cleaned)
+        let scores = TileScoring.perTileScores(for: cleaned)
+        let loopScore = scores.isEmpty ? 0 : scores.values.reduce(0, +) / Double(scores.count)
+        // wall = trail ∪ territory owned BEFORE this drive
+        // using the start snapshot (not live claimedCells) keeps freshly-captured interior out of the wall,
+        // so re-triggers re-compute the same interior idempotently instead of recursively filling inward.
+        // exclude the home hex so a loop drawn around it doesn't make home's neighbors a max-score ring of "padding"
+        let home = store.localPlayer.homeCell
+        let walls = ownedAtDriveStart.subtracting([home])
+        let enclosed = Enclosure.enclose(trail: crossed, owned: walls, loopScore: loopScore)
+        // dont claim zero scores or home hex
+        for (tile, score) in enclosed.scoredInterior where score > 0 && tile != home {
+            store.claim(tile, score: score, now: now)
         }
     }
 
@@ -159,12 +218,7 @@ public final class DriveTracker {
         guard var drive = currentDrive else { return }
         drive.endedAt = Date()
 
-        let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
-        let scores = TileScoring.perTileScores(for: cleaned)
-        drive.perTileScores = scores
-        for (tile, score) in scores {
-            store.claim(tile, score: score)
-        }
+        drive.perTileScores = applyPerTileScores()
 
         // persist the finished drive (uploaded = false), the future backend upload reads from here
         store.record(drive)
