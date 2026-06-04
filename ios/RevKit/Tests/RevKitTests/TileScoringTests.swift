@@ -90,6 +90,28 @@ struct TileScoringTests {
         #expect(scores.isEmpty)
     }
 
+    @Test func movementStatsSumDistanceAndMovingTime() {
+        let lngStep = 0.0003
+        let dt = 2.0
+        let samples = track(steps: 8, lngStep: lngStep, dt: dt)
+
+        let expectedDistance = zip(samples, samples.dropFirst())
+            .reduce(0.0) { $0 + GPSOutlierFilter.distanceMeters($1.0, $1.1) }
+        let expectedTime = Double(samples.count - 1) * dt
+
+        let stats = TileScoring.movementStats(for: samples)
+        #expect(abs(stats.distanceMeters - expectedDistance) < 0.01)
+        #expect(abs(stats.movingTime - expectedTime) < 0.01)
+    }
+
+    @Test func movementStatsExcludesStoppedSegments() {
+        // ~0.2 m steps once per second, below the stopped-speed floor, so nothing counts
+        let samples = track(steps: 6, lngStep: 0.0000025, dt: 1.0)
+        let stats = TileScoring.movementStats(for: samples)
+        #expect(stats.distanceMeters == 0)
+        #expect(stats.movingTime == 0)
+    }
+
     /// the score is distance-weighted
     @Test func scoreIsDistanceWeightedNotArithmeticMean() {
         let start = Date(timeIntervalSince1970: 0)

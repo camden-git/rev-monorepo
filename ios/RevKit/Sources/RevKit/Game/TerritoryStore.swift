@@ -49,13 +49,18 @@ public final class TerritoryStore {
     // MARK: claiming
 
     /// resolve and (if the outcome mutates) persist a claim. `ownerId` defaults to the local player
-    /// so the existing `DriveTracker` traversal/finalize calls keep working unchanged
+    /// so the existing `DriveTracker` traversal/finalize calls keep working unchanged.
+    ///
+    /// returns the resolved `ClaimOutcome` so callers can account for what changed (the per-drive
+    /// summary). `@discardableResult` keeps every existing call site - which actually ignores the result -
+    /// source-compatible
+    @discardableResult
     public func claim(
         _ cellIndex: UInt64,
         score: Double = 0,
         by ownerId: String? = nil,
         now: Date = .now
-    ) {
+    ) -> ClaimResolver.ClaimOutcome {
         let claimant = ownerId ?? localPlayer.id
         let current = tiles[cellIndex]
         let outcome = ClaimResolver.resolve(
@@ -67,7 +72,7 @@ public final class TerritoryStore {
 
         switch outcome {
         case .noChange:
-            return
+            break
         case let .created(newScore):
             upsert(cellIndex, ownerId: claimant, score: newScore, isHome: false, now: now)
         case let .reinforced(newScore):
@@ -76,6 +81,7 @@ public final class TerritoryStore {
         case let .captured(newScore):
             upsert(cellIndex, ownerId: claimant, score: newScore, isHome: false, now: now)
         }
+        return outcome
     }
 
     // MARK: home hex
@@ -121,10 +127,13 @@ public final class TerritoryStore {
         )
     }
 
-    /// persist a finished drive so it survives relaunch and is ready for the
-    /// future upload queue REF: docs/tech-stack.md §Sync Model
-    public func record(_ drive: Drive) {
-        context.insert(DriveRecord(drive: drive))
+    /// persist a finished drive (with its provisional summary) so it survives relaunch and is ready
+    /// for the future upload queue REF: docs/tech-stack.md §Sync Model
+    ///
+    /// future server side: `summary` is the local provisional tall, on upload the backend returns
+    /// the authoritative result and this record's summary is replaced
+    public func record(_ drive: Drive, summary: DriveSummary? = nil) {
+        context.insert(DriveRecord(drive: drive, summary: summary))
         try? context.save()
     }
 

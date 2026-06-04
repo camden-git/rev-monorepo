@@ -22,9 +22,32 @@ public final class DriveTracker {
     public private(set) var authorizationStatus: CLAuthorizationStatus
     public private(set) var currentSpeedMph: Double = 0
 
+    /// provisional recap of the most recently finished drive, drives the post-drive summary UI
+    /// nil while a drive is in progress (cleared when a new drive begins)
+    public private(set) var lastDriveSummary: DriveSummary?
+
+    /// live HUD: the tile currently being driven on
+    /// cleared when the drive ends
+    public private(set) var contestedOwnerName: String?
+    public private(set) var contestedScore: Double?
+
     public var claimedTileCount: Int { store.claimedCells.count }
     public var drivePath: [CLLocationCoordinate2D] {
         currentDrive?.rawPath.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) } ?? []
+    }
+
+    /// live count of tiles gained this drive
+    public var claimsThisDrive: Int {
+        let me = store.localPlayer.id
+        return beforeOwners.reduce(0) { count, entry in
+            store.tiles[entry.key]?.ownerId == me && entry.value != me ? count + 1 : count
+        }
+    }
+
+    /// live distance driven this drive (meters), using the same moving-segment filter as scoring
+    public var driveDistanceMeters: Double {
+        guard let drive = currentDrive else { return 0 }
+        return TileScoring.movementStats(for: GPSOutlierFilter.filterOutliers(drive.rawPath)).distanceMeters
     }
 
     private let store: TerritoryStore
@@ -40,6 +63,12 @@ public final class DriveTracker {
     private var ownedAtDriveStart: Set<UInt64> = []
     private var hasLeftOwned = false
     private var lastTile: UInt64?
+
+    /// per-drive net-diff accounting, reset per drive
+    /// owner of each touched cell when the drive first claimed it (nil value = was unowned)
+    private var beforeOwners: [UInt64: String?] = [:]
+    /// cells gained as enclosed interior this drive
+    private var enclosedCells: Set<UInt64> = []
     /// how long activity must read stationary before we drop back to significant-change
     private let stationaryGrace: Duration = .seconds(60)
 
@@ -144,6 +173,19 @@ public final class DriveTracker {
         ownedAtDriveStart = store.claimedCells
         hasLeftOwned = false
         lastTile = nil
+        beforeOwners = [:]
+        enclosedCells = []
+        contestedOwnerName = nil
+        contestedScore = nil
+        lastDriveSummary = nil
+    }
+
+    /// remember who owned a cell the first time this drive claims it, so the summary can diff
+    /// against pre-drive ownership
+    private func recordBeforeOwner(_ cell: UInt64) {
+        if beforeOwners.index(forKey: cell) == nil {
+            beforeOwners[cell] = store.tiles[cell]?.ownerId
+        }
     }
 
     fileprivate func ingest(_ locations: [CLLocation]) {
@@ -170,7 +212,11 @@ public final class DriveTracker {
                     if !ownedAtStart { hasLeftOwned = true }
                     visitedTiles.insert(tile)
                     lastTile = tile
+                    let owner = store.owner(of: tile)
+                    contestedOwnerName = owner?.displayName ?? "Unclaimed"
+                    contestedScore = store.effectiveScore(of: tile, now: sample.timestamp)
                 }
+                recordBeforeOwner(tile)
                 store.claim(tile)
             }
         }
@@ -188,6 +234,7 @@ public final class DriveTracker {
         let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
         let scores = TileScoring.perTileScores(for: cleaned)
         for (tile, score) in scores {
+            recordBeforeOwner(tile)
             store.claim(tile, score: score)
         }
         return scores
@@ -210,6 +257,8 @@ public final class DriveTracker {
         let enclosed = Enclosure.enclose(trail: crossed, owned: walls, loopScore: loopScore)
         // dont claim zero scores or home hex
         for (tile, score) in enclosed.scoredInterior where score > 0 && tile != home {
+            recordBeforeOwner(tile)
+            enclosedCells.insert(tile)
             store.claim(tile, score: score, now: now)
         }
     }
@@ -218,13 +267,41 @@ public final class DriveTracker {
         guard var drive = currentDrive else { return }
         drive.endedAt = Date()
 
-        drive.perTileScores = applyPerTileScores()
+        let finalScores = applyPerTileScores()
+        drive.perTileScores = finalScores
 
-        // persist the finished drive (uploaded = false), the future backend upload reads from here
-        store.record(drive)
+        let summary = buildSummary(perTileScores: finalScores, rawPath: drive.rawPath)
+        lastDriveSummary = summary
+
+        // persist the finished drive + its provisional summary (uploaded = false), the future
+        // backend upload reads from here and returns the authoritative result
+        store.record(drive, summary: summary)
         currentDrive = drive
         isRecording = false
         currentSpeedMph = 0
+        contestedOwnerName = nil
+        contestedScore = nil
+    }
+
+    /// diff the drive's net per-tile ownership change into a `DriveSummary` (REF:
+    /// docs/game-design.md §Claiming)
+    private func buildSummary(perTileScores: [UInt64: Double], rawPath: [GPSSample]) -> DriveSummary {
+        let me = store.localPlayer.id
+        let changes: [TileChange] = beforeOwners.map { cell, before in
+            TileChange(
+                cell: cell,
+                previousOwner: before,
+                finalOwner: store.tiles[cell]?.ownerId ?? "",
+                provenance: enclosedCells.contains(cell) ? .enclosure : .direct
+            )
+        }
+        let stats = TileScoring.movementStats(for: GPSOutlierFilter.filterOutliers(rawPath))
+        let metrics = DriveSummary.Metrics(
+            distanceMeters: stats.distanceMeters,
+            movingTime: stats.movingTime,
+            perTileScores: perTileScores
+        )
+        return DriveSummary.build(changes: changes, localPlayerId: me, metrics: metrics)
     }
 
     fileprivate func authorizationChanged(_ status: CLAuthorizationStatus) {

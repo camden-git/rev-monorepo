@@ -69,6 +69,26 @@ public enum TileScoring {
         return scores
     }
 
+    /// total distance moved and time spent moving across a (filtered) path
+    public static func movementStats(for samples: [GPSSample]) -> (distanceMeters: Double, movingTime: TimeInterval) {
+        guard samples.count > 1 else { return (0, 0) }
+
+        var totalDistance = 0.0
+        var totalMovingTime = 0.0
+        for (a, b) in zip(samples, samples.dropFirst()) {
+            let dt = b.timestamp.timeIntervalSince(a.timestamp)
+            guard dt > 0 else { continue }
+
+            let distance = GPSOutlierFilter.distanceMeters(a, b)
+            let segmentSpeed = distance / dt
+            guard segmentSpeed >= stoppedSpeedMetersPerSecond else { continue }
+
+            totalDistance += distance
+            totalMovingTime += dt
+        }
+        return (totalDistance, totalMovingTime)
+    }
+
     /// ordered and de-duplicated list of res-10 cells the path passes through (first-seen order)
     /// to be used by the live-claim path to know which tiles a drive has entered
     public static func tilesCrossed(for samples: [GPSSample]) -> [UInt64] {

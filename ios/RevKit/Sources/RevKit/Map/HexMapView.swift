@@ -160,7 +160,9 @@ public struct HexMapView: UIViewRepresentable {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
                 renderer.strokeColor = UIColor.systemOrange
-                renderer.lineWidth = 3
+                renderer.lineWidth = 4
+                renderer.lineCap = .round
+                renderer.lineDashPattern = [2, 8]
                 return renderer
             }
             // local player's home hex
