@@ -4,4 +4,4 @@ Rev is a territory racing game that is my personal project. I decided to write t
 
 ## License
 
-See [LICENSE](https://github.com/camden-git/rev-monorepo/blob/master/LICENSE) for more information regarding the MIT license.
+See [LICENSE](https://github.com/camden-git/rev-monorepo/blob/develop/LICENSE) for more information regarding the MIT license.
