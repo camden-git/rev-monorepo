@@ -3,11 +3,14 @@ import Foundation
 import SwiftData
 import SwiftyH3
 
-/// first-launch seed so the local-only build has a home hex and real opponents to compete with
+/// first-launch seed so the local-only build has real opponents to compete with
+///
 /// everything is positioned relative to the test route (scripts/chicago-drive.gpx), which runs
 /// east along `routeLat`:
-///   - the local player's **home** sits on an off-route neighbor of the start cell, so a drive
-///     doesn't just reinforce it (home inviolability is exercised by the unit tests)
+///   - the local player is seeded with **no home** (`homeH3 == 0`), the home is chosen during
+///     onboarding (see `RootView` / `OnboardingView` -> `TerritoryStore.establishHome`).
+///     FUTURE (server-side): the home is assigned at signup in `backend/internal/game/`
+///     off sign in with apple
 ///   - **Ada** (red) owns the first route cell, strong + freshly driven meaning her decayed score still
 ///     beats a normal drive, so that tile should NOT flip
 ///   - **Owen** (green) owns the last route cell and due to his score should be captued
@@ -30,21 +33,23 @@ public enum Seeder {
         let now = Date()
         let twoWeeksAgo = now.addingTimeInterval(-14 * 24 * 60 * 60)
 
-        // home: a neighbor of the start cell that the route does not cross
-        let neighbors = ((try? startCell.gridDisk(distance: 1)) ?? []).map(\.id)
-        let homeCell = neighbors.first { !routeSet.contains($0) && $0 != startCell.id } ?? startCell.id
-
-        let local = Player(displayName: "You", homeH3: homeCell, colorHex: "#3B82F6", isLocal: true)
+        // local player starts with NO home (homeH3 == 0) so onboarding prompts for one
+        let local = Player(displayName: "You", homeH3: 0, colorHex: "#3B82F6", isLocal: true)
         context.insert(local)
-        context.insert(TileRecord(h3: homeCell, ownerId: local.id, claimScore: 0, lastDrivenAt: now, isHome: true))
 
-        // opponent tiles live on the cells the drive actually crosses (minus home)
-        let opponentCells = routeCells.filter { $0 != homeCell }
+        // opponent tiles live on the cells the drive actually crosses
+        let opponentCells = routeCells
 
-        let ada = Player(displayName: "Ada", homeH3: opponentCells.first ?? startCell.id, colorHex: "#EF4444", isLocal: false)
+        // Ada's home
+        let neighbors = ((try? startCell.gridDisk(distance: 1)) ?? []).map(\.id)
+        let adaHome = neighbors.first { !routeSet.contains($0) && $0 != startCell.id } ?? startCell.id
+
+        let ada = Player(displayName: "Ada", homeH3: adaHome, colorHex: "#EF4444", isLocal: false)
         context.insert(ada)
         let owen = Player(displayName: "Owen", homeH3: opponentCells.last ?? startCell.id, colorHex: "#22C55E", isLocal: false)
         context.insert(owen)
+
+        context.insert(TileRecord(h3: adaHome, ownerId: ada.id, claimScore: 0, lastDrivenAt: now, isHome: true))
 
         if let adaCell = opponentCells.first {
             // should not flip

@@ -13,6 +13,14 @@ struct RootView: View {
     }
 
     var body: some View {
+        if store.needsOnboarding {
+            OnboardingView(store: store)
+        } else {
+            mapContent
+        }
+    }
+
+    private var mapContent: some View {
         HexMapView(store: store, breadcrumb: tracker.drivePath)
             .ignoresSafeArea()
             .overlay(alignment: .bottom) { controlPanel }
@@ -59,6 +67,7 @@ private extension View {
         }
     }
 
+    // TODO: Liquid ass needs more work!
     @ViewBuilder
     func driveButtonStyle(recording: Bool) -> some View {
         if #available(iOS 26, *) {

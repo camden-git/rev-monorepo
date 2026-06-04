@@ -3,7 +3,7 @@ import MapKit
 import SwiftyH3
 
 /// helpers over SwiftyH3 for the map slice
-enum H3Grid {
+public enum H3Grid {
     static let resolution: H3Cell.Resolution = .res10
 
     /// an approximation of res-10 hexagon edge length in meters
@@ -15,6 +15,11 @@ enum H3Grid {
     /// the res-10 cell containing a coordinate, nil if conversion fails
     static func cell(for coordinate: CLLocationCoordinate2D) -> H3Cell? {
         try? H3LatLng(coordinate).cell(at: resolution)
+    }
+
+    /// res-10 cell id (UInt64) for a coordinate
+    public static func cellId(for coordinate: CLLocationCoordinate2D) -> UInt64? {
+        cell(for: coordinate)?.id
     }
 
     /// res-10 cells covering (roughly) the visible region: the center cell expanded by a grid

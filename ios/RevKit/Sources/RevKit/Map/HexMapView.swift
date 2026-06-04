@@ -1,6 +1,7 @@
 #if canImport(UIKit)
 import MapKit
 import SwiftUI
+import SwiftyH3
 
 /// MapKit map with the H3 res-10 grid overlay
 public struct HexMapView: UIViewRepresentable {
@@ -52,6 +53,8 @@ public struct HexMapView: UIViewRepresentable {
         private var gridOverlay: MKMultiPolygon?
         /// one overlay per player; the value's identity is matched in `rendererFor`.
         private var playerOverlays: [String: MKMultiPolygon] = [:]
+        /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
+        private var homeOverlay: MKPolygon?
         private var breadcrumbOverlay: MKPolyline?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
@@ -83,6 +86,16 @@ public struct HexMapView: UIViewRepresentable {
                 guard let overlay = H3Grid.claimedOverlay(for: store.cells(ownedBy: player.id)) else { continue }
                 playerOverlays[player.id] = overlay
                 mapView.addOverlay(overlay)
+            }
+
+            // the local player's home hex on top
+            if let homeOverlay { mapView.removeOverlay(homeOverlay) }
+            homeOverlay = nil
+            let homeCell = store.localPlayer.homeCell
+            if homeCell != 0, let boundary = try? H3Cell(homeCell).boundary {
+                let polygon = MKPolygon(boundary)
+                homeOverlay = polygon
+                mapView.addOverlay(polygon)
             }
         }
 
@@ -147,6 +160,14 @@ public struct HexMapView: UIViewRepresentable {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
                 renderer.strokeColor = UIColor.systemOrange
+                renderer.lineWidth = 3
+                return renderer
+            }
+            // local player's home hex
+            if let homeOverlay, overlay === homeOverlay {
+                let renderer = MKPolygonRenderer(polygon: homeOverlay)
+                renderer.fillColor = UIColor.systemYellow.withAlphaComponent(0.35)
+                renderer.strokeColor = UIColor.systemYellow
                 renderer.lineWidth = 3
                 return renderer
             }

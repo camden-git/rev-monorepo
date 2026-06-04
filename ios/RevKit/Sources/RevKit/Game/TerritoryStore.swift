@@ -21,14 +21,19 @@ public final class TerritoryStore {
     /// h3 cell -> current state, for both claim resolution and the per-player overlays
     public private(set) var tiles: [UInt64: ClaimResolver.TileState] = [:]
 
+    /// true until the local player has chosen a home hex (`homeH3 == 0`)
+    public private(set) var needsOnboarding: Bool
+
     public init(context: ModelContext) {
         self.context = context
         Seeder.seedIfEmpty(context)
 
         let loadedPlayers = (try? context.fetch(FetchDescriptor<Player>())) ?? []
-        players = loadedPlayers
-        localPlayer = loadedPlayers.first(where: { $0.isLocal })
+        let local = loadedPlayers.first(where: { $0.isLocal })
             ?? Player(displayName: "You", homeH3: 0, colorHex: "#3B82F6", isLocal: true)
+        players = loadedPlayers
+        localPlayer = local
+        needsOnboarding = local.homeH3 == 0
 
         let records = (try? context.fetch(FetchDescriptor<TileRecord>())) ?? []
         for record in records {
@@ -71,6 +76,23 @@ public final class TerritoryStore {
         case let .captured(newScore):
             upsert(cellIndex, ownerId: claimant, score: newScore, isHome: false, now: now)
         }
+    }
+
+    // MARK: home hex
+
+    /// every home hex owned by someone other than the local player
+    public var otherPlayerHomeCells: Set<UInt64> {
+        Set(tiles.filter { $0.value.isHome && $0.value.ownerId != localPlayer.id }.keys)
+    }
+
+    /// persist the local player's chosen home
+    ///
+    /// FUTURE (server-side)
+    public func establishHome(at cell: UInt64, now: Date = .now) {
+        localPlayer.homeH3 = Int64(h3: cell)
+        try? context.save()
+        upsert(cell, ownerId: localPlayer.id, score: 0, isHome: true, now: now)
+        needsOnboarding = false
     }
 
     private func upsert(_ cellIndex: UInt64, ownerId: String, score: Double, isHome: Bool, now: Date) {
