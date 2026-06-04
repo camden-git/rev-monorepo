@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A612DB066C3D529986584A8B /* RevApp.swift */; };
+		39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */; };
 		93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15713F2A44FA62B340F54D44 /* OnboardingView.swift */; };
 		9422689350B941F2325CCDA5 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76981DF5A715E1D4AC6D1 /* RootView.swift */; };
 		9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */; };
@@ -15,14 +16,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryView.swift; sourceTree = "<group>"; };
 		15713F2A44FA62B340F54D44 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSummaryView.swift; sourceTree = "<group>"; };
 		32B76981DF5A715E1D4AC6D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
+		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RevKit; path = RevKit; sourceTree = SOURCE_ROOT; };
 		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
-		E94D0C0F2FD20BA600D6E18B /* chicago-loop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-loop.gpx"; path = "../scripts/chicago-loop.gpx"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +66,7 @@
 		B1B3B3DF4CE62CE68F89C3C4 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */,
 				2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */,
 				15713F2A44FA62B340F54D44 /* OnboardingView.swift */,
 				A612DB066C3D529986584A8B /* RevApp.swift */,
@@ -76,7 +78,6 @@
 		B70B2AEF25D0AE17A0127E4F = {
 			isa = PBXGroup;
 			children = (
-				E94D0C0F2FD20BA600D6E18B /* chicago-loop.gpx */,
 				71FA7C28AE8D30D4F8AAF814 /* Packages */,
 				67C259D607CD7F162B12DE16 /* Rev */,
 				7232386AC9B9B6FFF0843CC7 /* Products */,
@@ -146,6 +147,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */,
 				9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */,
 				93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */,
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,

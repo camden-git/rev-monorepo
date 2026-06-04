@@ -137,6 +137,29 @@ public final class TerritoryStore {
         try? context.save()
     }
 
+    // MARK: history / stats
+
+    /// every persisted drive, newest first (for the history list)
+    ///
+    /// future server side
+    public func driveHistory() -> [DriveRecord] {
+        let descriptor = FetchDescriptor<DriveRecord>(
+            sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// aggregate empire overview from the current tile cache + persisted drive summaries
+    public func empireStats(now: Date = .now, atRiskFraction: Double = 0.5) -> EmpireStats {
+        EmpireStats.compute(
+            tiles: Array(tiles.values),
+            ownedBy: localPlayer.id,
+            driveSummaries: driveHistory().compactMap(\.summary),
+            now: now,
+            atRiskFraction: atRiskFraction
+        )
+    }
+
     // MARK: rendering / inspection
 
     /// cells currently owned by a player

@@ -9,6 +9,7 @@ struct RootView: View {
     /// the post-drive recap surfaces first as a toast, which expands to the full sheet
     @State private var showToast = false
     @State private var showSummarySheet = false
+    @State private var showHistory = false
     @State private var toastTask: Task<Void, Never>?
 
     init(context: ModelContext) {
@@ -41,6 +42,11 @@ struct RootView: View {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                 }
+            }
+            .sheet(isPresented: $showHistory) {
+                DriveHistoryView(store: store) { showHistory = false }
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
     }
 
@@ -99,6 +105,12 @@ struct RootView: View {
                     .monospacedDigit()
                 Text("\(tracker.claimedTileCount) tiles")
                     .foregroundStyle(.secondary)
+                Divider().frame(height: 18)
+                Button { showHistory = true } label: {
+                    Image(systemName: "chart.bar.xaxis")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Drive history and empire stats")
             }
             .font(.subheadline.weight(.medium))
             .padding(.horizontal, 18)
