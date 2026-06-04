@@ -166,7 +166,8 @@ public final class DriveTracker {
             store.claim(tile, score: score)
         }
 
-        // SwiftData: persist `drive` here (uploaded = false) and enqueue it for backend upload
+        // persist the finished drive (uploaded = false), the future backend upload reads from here
+        store.record(drive)
         currentDrive = drive
         isRecording = false
         currentSpeedMph = 0

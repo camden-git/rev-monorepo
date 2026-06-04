@@ -45,6 +45,44 @@ struct TileScoringTests {
         #expect(scores.keys.allSatisfy { crossed.contains($0) })
     }
 
+    /// da
+    @Test func longSegmentIsSplitAcrossTilesNotDumpedOnDepartingTile() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let samples = [
+            GPSSample(timestamp: t0, lat: base.latitude, lng: -87.6300, speed: -1, accuracy: 5),
+            GPSSample(timestamp: t0.addingTimeInterval(5), lat: base.latitude, lng: -87.6270, speed: -1, accuracy: 5),
+        ]
+        let scores = TileScoring.perTileScores(for: samples)
+        #expect(scores.count >= 2) // old behavior would have produced exactly one
+    }
+
+    /// clipping a hex and then accelerating away must not let that tile inherit the post-clip burst
+    /// speed
+    @Test func briefFastClipDoesNotInflateAWellTraversedTile() {
+        let lat = base.latitude
+        let lng0 = base.longitude
+        let t0 = Date(timeIntervalSince1970: 0)
+
+        // slow, dense traversal that stays inside one tile (~16 m at ~3.3 m/s)
+        var samples = (0...5).map { i in
+            GPSSample(timestamp: t0.addingTimeInterval(Double(i)),
+                      lat: lat, lng: lng0 + Double(i) * 0.00004, speed: -1, accuracy: 5)
+        }
+        let tile = try! #require(TileScoring.cell(lat: lat, lng: lng0))
+        #expect(TileScoring.tilesCrossed(for: samples) == [tile])
+        let slowScore = try! #require(TileScoring.perTileScores(for: samples)[tile])
+
+        samples.append(GPSSample(timestamp: t0.addingTimeInterval(6), lat: lat, lng: lng0 + 0.003, speed: -1, accuracy: 5))
+        let burstScore = try! #require(TileScoring.perTileScores(for: samples)[tile])
+
+        let slowDist = GPSOutlierFilter.distanceMeters(samples[0], samples[5])
+        let burstDist = GPSOutlierFilter.distanceMeters(samples[5], samples[6])
+        let naiveInflated = (slowDist + burstDist) / 6.0 * TileScoring.mphPerMetersPerSecond
+
+        #expect(burstScore < naiveInflated * 0.6)
+        #expect(burstScore >= slowScore - 0.5)
+    }
+
     @Test func stoppedSegmentsAreExcluded() {
         // ~0.2 m steps once per second
         let samples = track(steps: 6, lngStep: 0.0000025, dt: 1.0)
@@ -55,11 +93,11 @@ struct TileScoringTests {
     /// the score is distance-weighted
     @Test func scoreIsDistanceWeightedNotArithmeticMean() {
         let start = Date(timeIntervalSince1970: 0)
-        // three fixes a few meters apart
+        // three fixes spread across one tile
         let lat = base.latitude
         let lng0 = base.longitude
-        let dLng1 = 0.00006 // ~5 m east
-        let dLng2 = 0.00004 // ~3 m more east
+        let dLng1 = 0.00018 // ~15 m east
+        let dLng2 = 0.00012 // ~10 m more east
         let samples = [
             GPSSample(timestamp: start, lat: lat, lng: lng0, speed: -1, accuracy: 5),
             GPSSample(timestamp: start.addingTimeInterval(1), lat: lat, lng: lng0 + dLng1, speed: -1, accuracy: 5),

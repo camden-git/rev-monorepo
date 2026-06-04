@@ -1,12 +1,13 @@
 import RevKit
+import SwiftData
 import SwiftUI
 
 struct RootView: View {
-    @State private var store = TerritoryStore()
+    @State private var store: TerritoryStore
     @State private var tracker: DriveTracker
 
-    init() {
-        let store = TerritoryStore()
+    init(context: ModelContext) {
+        let store = TerritoryStore(context: context)
         _store = State(initialValue: store)
         _tracker = State(initialValue: DriveTracker(store: store))
     }
@@ -69,5 +70,9 @@ private extension View {
 }
 
 #Preview {
-    RootView()
+    let container = try! ModelContainer(
+        for: Player.self, TileRecord.self, DriveRecord.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
+    return RootView(context: container.mainContext)
 }

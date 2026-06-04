@@ -2,8 +2,7 @@
 import MapKit
 import SwiftUI
 
-/// MapKit map with an H3 res-10 grid overlay, the live claimed-territory fill, and an optional
-/// breadcrumb of the in-progress drive. tap-to-claim remains as a debug input and needs to be removed later
+/// MapKit map with the H3 res-10 grid overlay
 public struct HexMapView: UIViewRepresentable {
     private let store: TerritoryStore
     private let breadcrumb: [CLLocationCoordinate2D]
@@ -51,7 +50,8 @@ public struct HexMapView: UIViewRepresentable {
         weak var mapView: MKMapView?
 
         private var gridOverlay: MKMultiPolygon?
-        private var claimedOverlay: MKMultiPolygon?
+        /// one overlay per player; the value's identity is matched in `rendererFor`.
+        private var playerOverlays: [String: MKMultiPolygon] = [:]
         private var breadcrumbOverlay: MKPolyline?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
@@ -75,12 +75,14 @@ public struct HexMapView: UIViewRepresentable {
         @MainActor
         func syncClaimedOverlay() {
             guard let mapView else { return }
-            if let claimedOverlay { mapView.removeOverlay(claimedOverlay) }
-            if let overlay = H3Grid.claimedOverlay(for: store.claimedCells) {
-                claimedOverlay = overlay
+            // remove and rebuild every player's overlay. fine at friend-group scale; REF:
+            // docs/tech-stack.md §Map Rendering notes the MKTileOverlay path for >~10k hexes.
+            for overlay in playerOverlays.values { mapView.removeOverlay(overlay) }
+            playerOverlays.removeAll()
+            for player in store.players {
+                guard let overlay = H3Grid.claimedOverlay(for: store.cells(ownedBy: player.id)) else { continue }
+                playerOverlays[player.id] = overlay
                 mapView.addOverlay(overlay)
-            } else {
-                claimedOverlay = nil
             }
         }
 
@@ -112,16 +114,31 @@ public struct HexMapView: UIViewRepresentable {
             )
         }
 
-        // MARK: tap to claim
+        // MARK: tap to inspect
 
+        /// tap a hex to see who owns it and at what (decayed) score. REF: docs/tech-stack.md
+        /// §Map Rendering — tap handling.
         @MainActor
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let mapView else { return }
             let point = gesture.location(in: mapView)
             let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
             guard let cell = H3Grid.cell(for: coordinate) else { return }
-            store.claim(cell.id)
-            syncClaimedOverlay()
+
+            let title: String
+            let message: String
+            if let owner = store.owner(of: cell.id), let effective = store.effectiveScore(of: cell.id) {
+                title = owner.displayName
+                let home = (store.tiles[cell.id]?.isHome ?? false) ? " · home" : ""
+                message = String(format: "%.0f mph effective%@", effective, home)
+            } else {
+                title = "Unclaimed"
+                message = "No owner yet"
+            }
+
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            mapView.window?.rootViewController?.present(alert, animated: true)
         }
 
         // MARK: rendering
@@ -137,9 +154,10 @@ public struct HexMapView: UIViewRepresentable {
                 return MKOverlayRenderer(overlay: overlay)
             }
             let renderer = MKMultiPolygonRenderer(multiPolygon: multiPolygon)
-            if overlay === claimedOverlay {
-                renderer.fillColor = UIColor.systemBlue.withAlphaComponent(0.4)
-                renderer.strokeColor = UIColor.systemBlue
+            if let ownerId = playerOverlays.first(where: { $0.value === overlay })?.key,
+               let color = store.player(id: ownerId).flatMap({ UIColor(hex: $0.colorHex) }) {
+                renderer.fillColor = color.withAlphaComponent(0.4)
+                renderer.strokeColor = color
                 renderer.lineWidth = 1.5
             } else {
                 renderer.fillColor = .clear
@@ -148,6 +166,21 @@ public struct HexMapView: UIViewRepresentable {
             }
             return renderer
         }
+    }
+}
+
+extension UIColor {
+    /// parse a "#RRGGBB" (or "RRGGBB") hex string; nil on malformed input.
+    convenience init?(hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let value = UInt32(s, radix: 16) else { return nil }
+        self.init(
+            red: CGFloat((value >> 16) & 0xFF) / 255,
+            green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: 1
+        )
     }
 }
 #endif

@@ -16,6 +16,20 @@ public enum TileScoring {
     /// segments slower than this count as "stopped"
     static let stoppedSpeedMetersPerSecond = 2.0 / mphPerMetersPerSecond
 
+    /// target length (m) of each sub-step a segment is broken into for tile attribution. small
+    /// relative to a res-10 hex (~130 m wide) so a segment is credited to each tile in proportion
+    /// to how much of it actually lies inside that tile.
+    static let subStepMeters = 8.0
+
+    /// cap on sub-steps per segment so a long GPS-gap segment can't blow up the loop.
+    static let maxSubSteps = 64
+
+    /// minimum distance (m) actually travelled inside a tile before it earns a score. a tile you
+    /// merely clip the edge of has too little in-tile travel to trust — its score would be a single
+    /// noisy GPS segment with nothing to average against, which read far too high. below this floor
+    /// the tile simply isn't scored (it may still be weakly claimed live at score 0).
+    static let minTileDistanceMeters = 12.0
+
     public static func perTileScores(for samples: [GPSSample]) -> [UInt64: Double] {
         guard samples.count > 1 else { return [:] }
 
@@ -30,14 +44,25 @@ public enum TileScoring {
             let segmentSpeed = distance / dt
             guard segmentSpeed >= stoppedSpeedMetersPerSecond else { continue }
 
-            // attribute the segment to the tile the segment departs from
-            guard let tile = cell(lat: a.lat, lng: a.lng) else { continue }
-            distanceByTile[tile, default: 0] += distance
-            movingTimeByTile[tile, default: 0] += dt
+            // walk the segment in small steps and attribute each step's distance/time to the tile
+            // it falls in. this keeps a barely-clipped tile from inheriting a whole segment's worth
+            // of travel that mostly happened in a neighbor (which inflates its score)
+            let steps = max(1, min(maxSubSteps, Int((distance / subStepMeters).rounded(.up))))
+            let stepDistance = distance / Double(steps)
+            let stepTime = dt / Double(steps)
+            for i in 0..<steps {
+                let fraction = (Double(i) + 0.5) / Double(steps)
+                let lat = a.lat + (b.lat - a.lat) * fraction
+                let lng = a.lng + (b.lng - a.lng) * fraction
+                guard let tile = cell(lat: lat, lng: lng) else { continue }
+                distanceByTile[tile, default: 0] += stepDistance
+                movingTimeByTile[tile, default: 0] += stepTime
+            }
         }
 
         var scores: [UInt64: Double] = [:]
         for (tile, distance) in distanceByTile {
+            guard distance >= minTileDistanceMeters else { continue }
             guard let movingTime = movingTimeByTile[tile], movingTime > 0 else { continue }
             scores[tile] = (distance / movingTime) * mphPerMetersPerSecond
         }
