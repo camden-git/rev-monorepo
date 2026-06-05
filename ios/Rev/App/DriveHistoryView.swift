@@ -17,14 +17,49 @@ struct DriveHistoryView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    overview
-                    driveList
+            List {
+                Section {
+                    HStack(spacing: 12) {
+                        statCell("\(stats.tilesHeld)", "Tiles held", .blue)
+                        statCell(
+                            "\(stats.tilesAtRisk)",
+                            "At risk",
+                            stats.tilesAtRisk > 0 ? .orange : .secondary
+                        )
+                        statCell(
+                            String(format: "%.0f", stats.strongholdScore),
+                            "Stronghold mph",
+                            .blue
+                        )
+                    }
+                    .padding(.vertical, 4)
                 }
-                .padding(20)
+
+                Section("Lifetime") {
+                    LabeledContent("Drives") {
+                        Text("\(stats.totalDrives)").monospacedDigit()
+                    }
+                    LabeledContent("Distance") {
+                        Text(lifetimeDistanceText).monospacedDigit()
+                    }
+                    LabeledContent("Tiles gained") {
+                        Text("+\(stats.lifetimeTilesGained)")
+                            .monospacedDigit()
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                if drives.isEmpty {
+                    Section { emptyState }
+                } else {
+                    Section("Past Drives") {
+                        ForEach(drives) { record in
+                            Button { selectedDrive = record } label: { driveRow(record) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                }
             }
-            .scrollContentBackground(.hidden)
             .navigationTitle("Your Empire")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -42,38 +77,9 @@ struct DriveHistoryView: View {
         }
     }
 
-    // MARK: empire overview
+    // MARK: rows
 
-    private var overview: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 12) {
-                statCard(value: "\(stats.tilesHeld)", label: "tiles held", tint: .blue)
-                statCard(
-                    value: "\(stats.tilesAtRisk)",
-                    label: "at risk",
-                    tint: stats.tilesAtRisk > 0 ? .orange : .secondary
-                )
-                statCard(
-                    value: String(format: "%.0f", stats.strongholdScore),
-                    label: "stronghold mph",
-                    tint: .blue
-                )
-            }
-
-            HStack {
-                lifetimeStat(value: "\(stats.totalDrives)", label: "drives")
-                Divider().frame(height: 32)
-                lifetimeStat(value: lifetimeDistanceText, label: "lifetime")
-                Divider().frame(height: 32)
-                lifetimeStat(value: "+\(stats.lifetimeTilesGained)", label: "tiles gained")
-            }
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity)
-            .empireGlassPanel(cornerRadius: 16)
-        }
-    }
-
-    private func statCard(value: String, label: String, tint: Color) -> some View {
+    private func statCell(_ value: String, _ label: String, _ tint: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.title2.weight(.bold).monospacedDigit())
@@ -84,46 +90,22 @@ struct DriveHistoryView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .empireGlassPanel(cornerRadius: 16, tint: tint.opacity(0.22), interactive: true)
     }
 
-    private func lifetimeStat(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.headline.monospacedDigit())
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "road.lanes")
+                .font(.largeTitle)
+                .foregroundStyle(.secondary)
+            Text("No drives yet")
+                .font(.headline)
+            Text("Start a drive to begin claiming territory.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    // MARK: past drives
-
-    @ViewBuilder
-    private var driveList: some View {
-        if drives.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "road.lanes")
-                    .font(.largeTitle)
-                    .foregroundStyle(.secondary)
-                Text("No drives yet")
-                    .font(.headline)
-                Text("Start a drive to begin claiming territory.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Past drives")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                ForEach(drives) { record in
-                    Button { selectedDrive = record } label: { driveRow(record) }
-                        .buttonStyle(.plain)
-                }
-            }
-        }
+        .padding(.vertical, 24)
     }
 
     private func driveRow(_ record: DriveRecord) -> some View {
@@ -146,11 +128,8 @@ struct DriveHistoryView: View {
             }
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .liquidGlassPanel(cornerRadius: 14, interactive: true)
     }
 
     // MARK: derived text
@@ -169,34 +148,5 @@ struct DriveHistoryView: View {
     private var lifetimeDistanceText: String {
         let miles = stats.lifetimeDistanceMeters / 1609.344
         return String(format: "%.1f mi", miles)
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func liquidGlassPanel(cornerRadius: CGFloat, tint: Color? = nil, interactive: Bool = false) -> some View {
-        if #available(iOS 26, *) {
-            let base: Glass = tint.map { Glass.regular.tint($0) } ?? .regular
-            let glass = interactive ? base.interactive() : base
-            glassEffect(glass, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        }
-    }
-
-    func empireGlassPanel(cornerRadius: CGFloat, tint: Color? = nil, interactive: Bool = false) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        return self
-            .background(.regularMaterial, in: shape)
-            .overlay {
-                shape
-                    .fill((tint ?? .white).opacity(tint == nil ? 0.10 : 0.18))
-                    .blendMode(.screen)
-            }
-            .overlay {
-                shape
-                    .strokeBorder(.white.opacity(0.34), lineWidth: 1)
-            }
-            .liquidGlassPanel(cornerRadius: cornerRadius, tint: tint, interactive: interactive)
     }
 }

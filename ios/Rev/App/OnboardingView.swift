@@ -233,7 +233,7 @@ private extension View {
     @ViewBuilder
     func glassCapsule() -> some View {
         if #available(iOS 26, *) {
-            glassEffect(.regular.interactive(), in: .capsule)
+            glassEffect(.regular, in: .capsule)
         } else {
             background(.ultraThinMaterial, in: Capsule())
         }

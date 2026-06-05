@@ -28,20 +28,32 @@ struct ProfileSettingsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    preview
-                    nameSection
-                    colorSection
-                    if let saveError {
+            Form {
+                Section { preview }
+
+                Section("Display Name") {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                }
+
+                Section("Map Color") {
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(MapColorPalette.swatches, id: \.self) { hex in
+                            swatch(hex)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+
+                if let saveError {
+                    Section {
                         Text(saveError)
                             .font(.caption)
                             .foregroundStyle(.red)
                     }
                 }
-                .padding(20)
             }
-            .scrollContentBackground(.hidden)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -80,36 +92,6 @@ struct ProfileSettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var nameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Display name")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            TextField("Name", text: $name)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-    }
-
-    private var colorSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Map color")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(MapColorPalette.swatches, id: \.self) { hex in
-                    swatch(hex)
-                }
-            }
         }
     }
 

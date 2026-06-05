@@ -13,15 +13,12 @@ struct LeaderboardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 10) {
-                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                        row(rank: index + 1, entry: entry)
-                    }
+            List {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    row(rank: index + 1, entry: entry)
+                        .listRowBackground(entry.isLocal ? Color.blue.opacity(0.12) : nil)
                 }
-                .padding(20)
             }
-            .scrollContentBackground(.hidden)
             .navigationTitle("Leaderboard")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -58,28 +55,6 @@ struct LeaderboardView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .liquidGlassPanel(cornerRadius: 14, tint: entry.isLocal ? .blue : nil, interactive: true)
-        .overlay {
-            if entry.isLocal {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(.blue.opacity(0.5), lineWidth: 1)
-            }
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func liquidGlassPanel(cornerRadius: CGFloat, tint: Color? = nil, interactive: Bool = false) -> some View {
-        if #available(iOS 26, *) {
-            let base: Glass = tint.map { Glass.regular.tint($0.opacity(0.18)) } ?? .regular
-            let glass = interactive ? base.interactive() : base
-            glassEffect(glass, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 }

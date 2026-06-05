@@ -28,6 +28,16 @@ public struct HexMapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = true
 
+        mapView.showsCompass = false
+        let compass = MKCompassButton(mapView: mapView)
+        compass.compassVisibility = .adaptive
+        compass.translatesAutoresizingMaskIntoConstraints = false
+        mapView.addSubview(compass)
+        NSLayoutConstraint.activate([
+            compass.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 8),
+            compass.leadingAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+        ])
+
         let fallback = CLLocationCoordinate2D(latitude: 41.8807, longitude: -87.6294)
         mapView.camera = MKMapCamera(
             lookingAtCenter: fallback,

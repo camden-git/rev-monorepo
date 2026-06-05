@@ -117,28 +117,41 @@ struct RootView: View {
     @ViewBuilder
     private var toast: some View {
         if showToast, let summary = tracker.lastDriveSummary {
-            Button {
-                toastTask?.cancel()
-                withAnimation { showToast = false }
-                showSummarySheet = true
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text(toastHeadline(summary))
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+            Group {
+                if #available(iOS 26, *) {
+                    Button(action: expandToastToSheet) { toastLabel(summary) }
+                        .buttonStyle(.glass)
+                } else {
+                    Button(action: expandToastToSheet) {
+                        toastLabel(summary)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 12)
+                            .glassCapsule()
+                    }
+                    .buttonStyle(.plain)
                 }
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
-                .glassCapsule()
             }
-            .buttonStyle(.plain)
             .padding(.top, 8)
             .transition(.move(edge: .top).combined(with: .opacity))
         }
+    }
+
+    private func toastLabel(_ summary: DriveSummary) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text(toastHeadline(summary))
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .font(.subheadline.weight(.medium))
+    }
+
+    private func expandToastToSheet() {
+        toastTask?.cancel()
+        withAnimation { showToast = false }
+        showSummarySheet = true
     }
 
     private func toastHeadline(_ s: DriveSummary) -> String {
@@ -148,49 +161,63 @@ struct RootView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// floating navigation toolbar, top-right
+    /// floating navigation controls, top-right
+    private var navActions: [NavAction] {
+        var actions: [NavAction] = [
+            NavAction(icon: "chart.bar.xaxis", label: "Drive history and empire stats") { showHistory = true },
+            NavAction(icon: "trophy", label: "Leaderboard") { showLeaderboard = true },
+            NavAction(icon: "person.crop.circle", label: "Profile settings") { showSettings = true },
+        ]
+        #if DEBUG
+        actions.append(NavAction(
+            icon: sync.isSignedIn ? "icloud.fill" : "icloud.slash",
+            label: "Dev sign in and sync",
+            tint: sync.isSignedIn ? .green : .secondary
+        ) {
+            Task {
+                await sync.devSignIn()
+                await sync.uploadPending()
+            }
+        })
+        #endif
+        return actions
+    }
+
+    @ViewBuilder
     private var navCluster: some View {
-        VStack(spacing: 8) {
-            Button { showHistory = true } label: {
-                Image(systemName: "chart.bar.xaxis")
-            }
-            .controlPanelIconButton()
-            .accessibilityLabel("Drive history and empire stats")
+        Group {
+            if #available(iOS 26, *) {
 
-            Button { showLeaderboard = true } label: {
-                Image(systemName: "trophy")
-            }
-            .controlPanelIconButton()
-            .accessibilityLabel("Leaderboard")
-
-            Button { showSettings = true } label: {
-                Image(systemName: "person.crop.circle")
-            }
-            .controlPanelIconButton()
-            .accessibilityLabel("Profile settings")
-
-            #if DEBUG
-            Divider().frame(width: 22)
-            Button {
-                Task {
-                    await sync.devSignIn()
-                    await sync.uploadPending()
+                VStack(spacing: 8) {
+                    ForEach(navActions) { item in
+                        Button(action: item.action) { navIcon(item) }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.circle)
+                            .accessibilityLabel(item.label)
+                    }
                 }
-            } label: {
-                Image(systemName: sync.isSignedIn ? "icloud.fill" : "icloud.slash")
-                    .foregroundStyle(sync.isSignedIn ? .green : .secondary)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(navActions) { item in
+                        Button(action: item.action) { navIcon(item) }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(item.label)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 4)
+                .background(.ultraThinMaterial, in: Capsule())
             }
-            .controlPanelIconButton()
-            .accessibilityLabel("Dev sign in and sync")
-            #endif
         }
-        .buttonStyle(.plain)
-        .font(.subheadline.weight(.medium))
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
-        .glassCapsule()
         .padding(.trailing)
         .padding(.top, 8)
+    }
+
+    private func navIcon(_ item: NavAction) -> some View {
+        Image(systemName: item.icon)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(item.tint ?? .primary)
+            .frame(width: 44, height: 44)
     }
 
     private var controlPanel: some View {
@@ -274,7 +301,7 @@ private extension View {
     @ViewBuilder
     func glassCapsule() -> some View {
         if #available(iOS 26, *) {
-            glassEffect(.regular.interactive(), in: .capsule)
+            glassEffect(.regular, in: .capsule)
         } else {
             background(.ultraThinMaterial, in: Capsule())
         }
@@ -289,9 +316,21 @@ private extension View {
         }
     }
 
-    func controlPanelIconButton() -> some View {
-        frame(width: 44, height: 44)
-            .contentShape(Circle())
+}
+
+/// a single floating navigation control in the top-right cluster
+private struct NavAction: Identifiable {
+    let id = UUID()
+    let icon: String
+    let label: String
+    var tint: Color?
+    let action: () -> Void
+
+    init(icon: String, label: String, tint: Color? = nil, action: @escaping () -> Void) {
+        self.icon = icon
+        self.label = label
+        self.tint = tint
+        self.action = action
     }
 }
 
