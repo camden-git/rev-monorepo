@@ -44,11 +44,10 @@ public final class DriveTracker {
         }
     }
 
-    /// live distance driven this drive (meters), using the same moving-segment filter as scoring
-    public var driveDistanceMeters: Double {
-        guard let drive = currentDrive else { return 0 }
-        return TileScoring.movementStats(for: GPSOutlierFilter.filterOutliers(drive.rawPath)).distanceMeters
-    }
+    /// live distance driven this drive (meters), using the same moving-segment filter as scoring.
+    /// cached and refreshed on each (throttled) live rescore + at finalize, so the HUD reading it
+    /// every second doesn't re-filter the whole path on every access
+    public private(set) var driveDistanceMeters: Double = 0
 
     private let store: TerritoryStore
     private let locationManager = CLLocationManager()
@@ -71,6 +70,10 @@ public final class DriveTracker {
     private var enclosedCells: Set<UInt64> = []
     /// how long activity must read stationary before we drop back to significant-change
     private let stationaryGrace: Duration = .seconds(60)
+
+    /// timestamp of the last live full-path rescore
+    private var lastLiveRescore: Date = .distantPast
+    private let liveRescoreInterval: TimeInterval = 3
 
     public init(store: TerritoryStore) {
         self.store = store
@@ -178,6 +181,8 @@ public final class DriveTracker {
         contestedOwnerName = nil
         contestedScore = nil
         lastDriveSummary = nil
+        driveDistanceMeters = 0
+        lastLiveRescore = .distantPast
     }
 
     /// remember who owned a cell the first time this drive claims it, so the summary can diff
@@ -221,22 +226,28 @@ public final class DriveTracker {
             }
         }
 
-        // re-score every crossed tile off the drive so far
-        applyPerTileScores()
+        // re-score the drive so far for live HUD feedback
+        let now = locations.last?.timestamp ?? Date()
+        if now.timeIntervalSince(lastLiveRescore) >= liveRescoreInterval {
+            lastLiveRescore = now
+            applyPerTileScores()
+        }
     }
 
-    /// (re)compute and apply the per-tile distance-weighted scores for the drive so far. used both
-    /// live (each ingest) and at finalize. a tile's score stabilizes once you leave it, so the
-    /// re-drive floor in `store.claim` keeps the right value
+    /// (re)compute and apply the per-tile distance-weighted scores for the drive so far, and refresh
+    /// the cached `driveDistanceMeters`. used both live (throttled) and at finalize. a tile's score
+    /// stabilizes once you leave it, so the re-drive floor in `store.claim` keeps the right value.
+    /// pass `cleaned` to reuse an already-filtered path and avoid a redundant filter pass
     @discardableResult
-    private func applyPerTileScores() -> [UInt64: Double] {
+    private func applyPerTileScores(cleaned: [GPSSample]? = nil) -> [UInt64: Double] {
         guard let drive = currentDrive else { return [:] }
-        let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
-        let scores = TileScoring.perTileScores(for: cleaned)
+        let cleanedPath = cleaned ?? GPSOutlierFilter.filterOutliers(drive.rawPath)
+        let scores = TileScoring.perTileScores(for: cleanedPath)
         for (tile, score) in scores {
             recordBeforeOwner(tile)
             store.claim(tile, score: score)
         }
+        driveDistanceMeters = TileScoring.movementStats(for: cleanedPath).distanceMeters
         return scores
     }
 
@@ -267,10 +278,12 @@ public final class DriveTracker {
         guard var drive = currentDrive else { return }
         drive.endedAt = Date()
 
-        let finalScores = applyPerTileScores()
+        // filter once
+        let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
+        let finalScores = applyPerTileScores(cleaned: cleaned)
         drive.perTileScores = finalScores
 
-        let summary = buildSummary(perTileScores: finalScores, rawPath: drive.rawPath)
+        let summary = buildSummary(perTileScores: finalScores, cleaned: cleaned)
         lastDriveSummary = summary
 
         // persist the finished drive + its provisional summary (uploaded = false), the future
@@ -285,7 +298,7 @@ public final class DriveTracker {
 
     /// diff the drive's net per-tile ownership change into a `DriveSummary` (REF:
     /// docs/game-design.md §Claiming)
-    private func buildSummary(perTileScores: [UInt64: Double], rawPath: [GPSSample]) -> DriveSummary {
+    private func buildSummary(perTileScores: [UInt64: Double], cleaned: [GPSSample]) -> DriveSummary {
         let me = store.localPlayer.id
         let changes: [TileChange] = beforeOwners.map { cell, before in
             TileChange(
@@ -295,7 +308,7 @@ public final class DriveTracker {
                 provenance: enclosedCells.contains(cell) ? .enclosure : .direct
             )
         }
-        let stats = TileScoring.movementStats(for: GPSOutlierFilter.filterOutliers(rawPath))
+        let stats = TileScoring.movementStats(for: cleaned)
         let metrics = DriveSummary.Metrics(
             distanceMeters: stats.distanceMeters,
             movingTime: stats.movingTime,

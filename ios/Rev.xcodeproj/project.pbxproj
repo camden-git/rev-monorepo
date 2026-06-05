@@ -31,8 +31,8 @@
 		40C0F969107087F96013E67F /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
 		5581F52012A4971B7DF1565F /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RevKit; path = RevKit; sourceTree = SOURCE_ROOT; };
-		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
+		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
 		F23E45A1D168FC97A7B75918 /* TileDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -131,11 +131,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					6DB0851F2343469158CF0ECF = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = E5AAED5AF29484A42097BAAF /* Build configuration list for PBXProject "Rev" */;
 			developmentRegion = en;
@@ -311,6 +306,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 543LGZY2RD;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
@@ -336,6 +332,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 543LGZY2RD;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;

@@ -116,6 +116,7 @@ public struct HexMapView: UIViewRepresentable {
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
         private var breadcrumbOverlay: MKPolyline?
+        private var breadcrumbCount = 0
         private var claimedOverlaySignature: ClaimedOverlaySignature?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
@@ -206,6 +207,10 @@ public struct HexMapView: UIViewRepresentable {
 
         func syncBreadcrumb(_ coordinates: [CLLocationCoordinate2D]) {
             guard let mapView else { return }
+            // updateUIView fires ~1 Hz during a drive (speed/state changes); only rebuild the
+            // polyline when the path actually grew, otherwise we redraw the whole line for nothing
+            guard coordinates.count != breadcrumbCount else { return }
+            breadcrumbCount = coordinates.count
             if let breadcrumbOverlay { mapView.removeOverlay(breadcrumbOverlay) }
             guard coordinates.count > 1 else {
                 breadcrumbOverlay = nil
