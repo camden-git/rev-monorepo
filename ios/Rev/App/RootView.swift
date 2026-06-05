@@ -249,6 +249,8 @@ struct RootView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
             .glassCapsule()
+            .contentShape(Capsule())
+            .onTapGesture {} // swallow taps so they don't fall through to the map's hex picker
 
             Button {
                 if tracker.isRecording { tracker.endDrive() } else { tracker.startDrive() }
@@ -284,6 +286,8 @@ struct RootView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 10)
             .glassCapsule()
+            .contentShape(Capsule())
+            .onTapGesture {} // swallow taps so they don't fall through to the map's hex picker
         }
     }
 
