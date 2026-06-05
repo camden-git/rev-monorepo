@@ -9,25 +9,30 @@
 /* Begin PBXBuildFile section */
 		119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A612DB066C3D529986584A8B /* RevApp.swift */; };
 		39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */; };
+		50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C0F969107087F96013E67F /* LeaderboardView.swift */; };
 		750F9185B65529585FBA4B91 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5581F52012A4971B7DF1565F /* AppleSignInButton.swift */; };
+		76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136227412603B5999AB44748 /* ProfileSettingsView.swift */; };
 		93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15713F2A44FA62B340F54D44 /* OnboardingView.swift */; };
 		9422689350B941F2325CCDA5 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76981DF5A715E1D4AC6D1 /* RootView.swift */; };
 		9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */; };
+		A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FDC10F6072E934167CD1D7 /* ColorHex.swift */; };
 		BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9B7B4275284769A91EF50C5 /* RevKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryView.swift; sourceTree = "<group>"; };
+		136227412603B5999AB44748 /* ProfileSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsView.swift; sourceTree = "<group>"; };
+		14FDC10F6072E934167CD1D7 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
 		15713F2A44FA62B340F54D44 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		26711864EBD6BFBDD37E9669 /* Rev.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rev.entitlements; sourceTree = "<group>"; };
 		2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSummaryView.swift; sourceTree = "<group>"; };
 		32B76981DF5A715E1D4AC6D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		40C0F969107087F96013E67F /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
 		5581F52012A4971B7DF1565F /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		95709F1C3F0444F2A61B8E37 /* Rev.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rev.entitlements; sourceTree = "<group>"; };
 		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
 		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
-		E94D0C102FD2629A00D6E18B /* chicago-loop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-loop.gpx"; path = "../scripts/chicago-loop.gpx"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,7 +51,7 @@
 			isa = PBXGroup;
 			children = (
 				91A4895964A768B703C46392 /* Info.plist */,
-				95709F1C3F0444F2A61B8E37 /* Rev.entitlements */,
+				26711864EBD6BFBDD37E9669 /* Rev.entitlements */,
 				B1B3B3DF4CE62CE68F89C3C4 /* App */,
 			);
 			path = Rev;
@@ -72,9 +77,12 @@
 			isa = PBXGroup;
 			children = (
 				5581F52012A4971B7DF1565F /* AppleSignInButton.swift */,
+				14FDC10F6072E934167CD1D7 /* ColorHex.swift */,
 				10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */,
 				2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */,
+				40C0F969107087F96013E67F /* LeaderboardView.swift */,
 				15713F2A44FA62B340F54D44 /* OnboardingView.swift */,
+				136227412603B5999AB44748 /* ProfileSettingsView.swift */,
 				A612DB066C3D529986584A8B /* RevApp.swift */,
 				32B76981DF5A715E1D4AC6D1 /* RootView.swift */,
 			);
@@ -84,7 +92,6 @@
 		B70B2AEF25D0AE17A0127E4F = {
 			isa = PBXGroup;
 			children = (
-				E94D0C102FD2629A00D6E18B /* chicago-loop.gpx */,
 				71FA7C28AE8D30D4F8AAF814 /* Packages */,
 				67C259D607CD7F162B12DE16 /* Rev */,
 				7232386AC9B9B6FFF0843CC7 /* Products */,
@@ -159,9 +166,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				750F9185B65529585FBA4B91 /* AppleSignInButton.swift in Sources */,
+				A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */,
 				39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */,
 				9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */,
+				50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */,
 				93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */,
+				76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */,
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,
 				9422689350B941F2325CCDA5 /* RootView.swift in Sources */,
 			);
@@ -305,7 +315,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Rev tracks your movement in the background to claim territory as you drive, bike, or walk.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rev records your drives to claim territory on the map.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Rev uses motion activity to start and stop drive recording automatically and save battery.";
@@ -332,7 +341,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Rev tracks your movement in the background to claim territory as you drive, bike, or walk.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Rev records your drives to claim territory on the map.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Rev uses motion activity to start and stop drive recording automatically and save battery.";

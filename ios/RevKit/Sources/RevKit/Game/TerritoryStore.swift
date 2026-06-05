@@ -169,6 +169,15 @@ public final class TerritoryStore {
         try? context.save()
     }
 
+    /// update the local player's display name + map color from the profile settings screen
+    public func updateLocalProfile(displayName: String, colorHex: String) {
+        localPlayer.displayName = displayName
+        localPlayer.colorHex = colorHex
+        try? context.save()
+        // reassign to nudge @Observable so the map overlay re-renders in the new color
+        players = players
+    }
+
     // MARK: home hex
 
     /// every home hex owned by someone other than the local player
@@ -243,6 +252,40 @@ public final class TerritoryStore {
             now: now,
             atRiskFraction: atRiskFraction
         )
+    }
+
+    /// a single row of the leaderboard: a player and how much territory they currently hold
+    public struct LeaderboardEntry: Identifiable, Sendable {
+        public let playerId: String
+        public let displayName: String
+        public let colorHex: String
+        public let isLocal: Bool
+        public let tilesHeld: Int
+        public var id: String { playerId }
+    }
+
+    /// rank every known player by tiles currently held, descending
+    /// players with no tiles still appear
+    public func leaderboard() -> [LeaderboardEntry] {
+        var counts: [String: Int] = [:]
+        for state in tiles.values {
+            counts[state.ownerId, default: 0] += 1
+        }
+        return players
+            .map { player in
+                LeaderboardEntry(
+                    playerId: player.id,
+                    displayName: player.displayName,
+                    colorHex: player.colorHex,
+                    isLocal: player.isLocal,
+                    tilesHeld: counts[player.id] ?? 0
+                )
+            }
+            .sorted {
+                $0.tilesHeld != $1.tilesHeld
+                    ? $0.tilesHeld > $1.tilesHeld
+                    : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            }
     }
 
     // MARK: rendering / inspection

@@ -82,7 +82,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
 
     func listUsers() async throws -> [PlayerDTO] {
         lock.withLock { listUsersCallCount += 1 }
-        try onListUsers()
+        return try onListUsers()
     }
 
     func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws {

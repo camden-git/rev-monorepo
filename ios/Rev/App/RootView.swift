@@ -14,6 +14,8 @@ struct RootView: View {
     @State private var showToast = false
     @State private var showSummarySheet = false
     @State private var showHistory = false
+    @State private var showLeaderboard = false
+    @State private var showSettings = false
     @State private var toastTask: Task<Void, Never>?
 
     init(context: ModelContext) {
@@ -53,6 +55,7 @@ struct RootView: View {
         HexMapView(store: store, breadcrumb: tracker.drivePath)
             .ignoresSafeArea()
             .overlay(alignment: .top) { toast }
+            .overlay(alignment: .topTrailing) { navCluster }
             .overlay(alignment: .bottom) { controlPanel }
             .task {
                 tracker.start()
@@ -75,6 +78,17 @@ struct RootView: View {
                 DriveHistoryView(store: store) { showHistory = false }
                     .presentationDetents([.medium, .large])
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showLeaderboard) {
+                LeaderboardView(store: store) { showLeaderboard = false }
+                    .presentationDetents([.medium, .large])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showSettings) {
+                ProfileSettingsView(store: store, sync: sync) { showSettings = false }
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
     }
@@ -123,6 +137,51 @@ struct RootView: View {
         return parts.joined(separator: " · ")
     }
 
+    /// floating navigation toolbar, top-right
+    private var navCluster: some View {
+        VStack(spacing: 8) {
+            Button { showHistory = true } label: {
+                Image(systemName: "chart.bar.xaxis")
+            }
+            .controlPanelIconButton()
+            .accessibilityLabel("Drive history and empire stats")
+
+            Button { showLeaderboard = true } label: {
+                Image(systemName: "trophy")
+            }
+            .controlPanelIconButton()
+            .accessibilityLabel("Leaderboard")
+
+            Button { showSettings = true } label: {
+                Image(systemName: "person.crop.circle")
+            }
+            .controlPanelIconButton()
+            .accessibilityLabel("Profile settings")
+
+            #if DEBUG
+            Divider().frame(width: 22)
+            Button {
+                Task {
+                    await sync.devSignIn()
+                    await sync.uploadPending()
+                }
+            } label: {
+                Image(systemName: sync.isSignedIn ? "icloud.fill" : "icloud.slash")
+                    .foregroundStyle(sync.isSignedIn ? .green : .secondary)
+            }
+            .controlPanelIconButton()
+            .accessibilityLabel("Dev sign in and sync")
+            #endif
+        }
+        .buttonStyle(.plain)
+        .font(.subheadline.weight(.medium))
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .glassCapsule()
+        .padding(.trailing)
+        .padding(.top, 8)
+    }
+
     private var controlPanel: some View {
         VStack(spacing: 12) {
             if tracker.isRecording { driveHUD }
@@ -134,31 +193,10 @@ struct RootView: View {
                     .monospacedDigit()
                 Text("\(tracker.claimedTileCount) tiles")
                     .foregroundStyle(.secondary)
-                Divider().frame(height: 18)
-                Button { showHistory = true } label: {
-                    Image(systemName: "chart.bar.xaxis")
-                }
-                .buttonStyle(.plain)
-                .controlPanelIconButton()
-                .accessibilityLabel("Drive history and empire stats")
-
-                #if DEBUG
-                Divider().frame(height: 18)
-                Button {
-                    Task {
-                        await sync.devSignIn()
-                        await sync.uploadPending()
-                    }
-                } label: {
-                    Image(systemName: sync.isSignedIn ? "icloud.fill" : "icloud.slash")
-                        .foregroundStyle(sync.isSignedIn ? .green : .secondary)
-                }
-                .buttonStyle(.plain)
-                .controlPanelIconButton()
-                .accessibilityLabel("Dev sign in and sync")
-                #endif
             }
             .font(.subheadline.weight(.medium))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
             .glassCapsule()

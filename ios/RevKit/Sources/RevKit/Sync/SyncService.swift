@@ -126,8 +126,9 @@ public final class SyncService {
 
     /// push the local player's profile (home hex, color, name) to their server
     /// user record so the roster reflects it
-    public func pushProfile() async {
-        guard let userId = currentUserId else { return }
+    @discardableResult
+    public func pushProfile() async -> Bool {
+        guard let userId = currentUserId else { return true }
         let local = store.localPlayer
         do {
             try await client.updateProfile(
@@ -137,8 +138,10 @@ public final class SyncService {
                 displayName: local.displayName
             )
             lastError = nil
+            return true
         } catch {
             lastError = String(describing: error)
+            return false
         }
     }
 
