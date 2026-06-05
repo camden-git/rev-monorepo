@@ -107,7 +107,7 @@ struct DriveSummaryView: View {
         }
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .liquidGlassPanel(cornerRadius: 16)
     }
 
     private func metric(value: String, label: String) -> some View {
@@ -161,6 +161,15 @@ private extension View {
             buttonStyle(.glassProminent).tint(.blue)
         } else {
             buttonStyle(.borderedProminent).tint(.blue)
+        }
+    }
+
+    @ViewBuilder
+    func liquidGlassPanel(cornerRadius: CGFloat) -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 }

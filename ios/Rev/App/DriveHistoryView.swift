@@ -24,6 +24,7 @@ struct DriveHistoryView: View {
                 }
                 .padding(20)
             }
+            .scrollContentBackground(.hidden)
             .navigationTitle("Your Empire")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -68,7 +69,7 @@ struct DriveHistoryView: View {
             }
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .empireGlassPanel(cornerRadius: 16)
         }
     }
 
@@ -84,7 +85,7 @@ struct DriveHistoryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+        .empireGlassPanel(cornerRadius: 16, tint: tint.opacity(0.22), interactive: true)
     }
 
     private func lifetimeStat(value: String, label: String) -> some View {
@@ -149,7 +150,7 @@ struct DriveHistoryView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .liquidGlassPanel(cornerRadius: 14, interactive: true)
     }
 
     // MARK: derived text
@@ -168,5 +169,34 @@ struct DriveHistoryView: View {
     private var lifetimeDistanceText: String {
         let miles = stats.lifetimeDistanceMeters / 1609.344
         return String(format: "%.1f mi", miles)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func liquidGlassPanel(cornerRadius: CGFloat, tint: Color? = nil, interactive: Bool = false) -> some View {
+        if #available(iOS 26, *) {
+            let base: Glass = tint.map { Glass.regular.tint($0) } ?? .regular
+            let glass = interactive ? base.interactive() : base
+            glassEffect(glass, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+    }
+
+    func empireGlassPanel(cornerRadius: CGFloat, tint: Color? = nil, interactive: Bool = false) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return self
+            .background(.regularMaterial, in: shape)
+            .overlay {
+                shape
+                    .fill((tint ?? .white).opacity(tint == nil ? 0.10 : 0.18))
+                    .blendMode(.screen)
+            }
+            .overlay {
+                shape
+                    .strokeBorder(.white.opacity(0.34), lineWidth: 1)
+            }
+            .liquidGlassPanel(cornerRadius: cornerRadius, tint: tint, interactive: interactive)
     }
 }

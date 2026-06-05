@@ -22,6 +22,11 @@ targets:
     platform: iOS
     sources:
       - path: Rev
+    entitlements:
+      path: Rev/Rev.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     dependencies:
       - package: RevKit
     settings:

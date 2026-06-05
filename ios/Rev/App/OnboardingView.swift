@@ -12,6 +12,8 @@ import SwiftUI
 /// behind Sign-in-with-Apple; this screen would post the chosen `home_h3` with the user record.
 struct OnboardingView: View {
     let store: TerritoryStore
+    let signIn: AppleSignInCoordinator
+    let sync: SyncService
 
     private static let fallback = CLLocationCoordinate2D(latitude: 41.8807, longitude: -87.6294)
 
@@ -49,12 +51,10 @@ struct OnboardingView: View {
             }
             .padding()
         }
-
-        // this needs to be worked on to get liquid glass to work right
         .sheet(isPresented: .constant(true)) {
             confirmPanel
-                .presentationDetents([.height(230)])
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(230)))
+                .presentationDetents([.height(390)])
+                .presentationBackgroundInteraction(.enabled(upThrough: .height(390)))
                 .presentationDragIndicator(.hidden)
                 .interactiveDismissDisabled()
         }
@@ -103,6 +103,13 @@ struct OnboardingView: View {
                     .padding(.vertical, 6)
             }
             .glassProminentButton()
+
+            InviteSignInView(sync: sync)
+
+            // scaffolding lowk
+            AppleSignInButton(coordinator: signIn) { response in
+                sync.adoptSession(response)
+            }
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -150,12 +157,77 @@ struct OnboardingView: View {
     }
 }
 
-// this needs work too
+private struct InviteSignInView: View {
+    let sync: SyncService
+
+    @State private var displayName = ""
+    @State private var email = ""
+    @State private var code = ""
+    @State private var isSubmitting = false
+
+    private var canSubmit: Bool {
+        !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if sync.isSignedIn {
+                Label("Invite accepted", systemImage: "checkmark.seal.fill")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.green)
+            } else {
+                TextField("Name", text: $displayName)
+                    .textContentType(.name)
+                TextField("Email", text: $email)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                TextField("Invite code", text: $code)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                Button {
+                    Task { await submit() }
+                } label: {
+                    if isSubmitting {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Enter with Invite", systemImage: "key.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(!canSubmit || isSubmitting)
+
+                if let error = sync.lastError {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .textFieldStyle(.roundedBorder)
+    }
+
+    private func submit() async {
+        isSubmitting = true
+        defer { isSubmitting = false }
+        await sync.signInWithInvite(
+            displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+            email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+            code: code.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+}
+
 private extension View {
     @ViewBuilder
     func glassCapsule() -> some View {
         if #available(iOS 26, *) {
-            glassEffect(.regular, in: .capsule)
+            glassEffect(.regular.interactive(), in: .capsule)
         } else {
             background(.ultraThinMaterial, in: Capsule())
         }

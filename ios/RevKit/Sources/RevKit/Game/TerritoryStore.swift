@@ -84,6 +84,22 @@ public final class TerritoryStore {
         return outcome
     }
 
+    // MARK: server sync
+
+    /// merge server-authoritative tile state into the local cache + persistence
+    ///
+    /// called by `TileSyncEngine` on each delta-poll, the server's view replaces
+    /// the provisional local resolution for the tiles it returns (REF:
+    /// docs/tech-stack.md §Updates to Clients - Polling)
+    ///
+    /// FUTURE (server-side): `TileDTO.owner` is a PocketBase user id
+    ///
+    public func applyRemoteTiles(_ tiles: [TileDTO]) {
+        for dto in tiles {
+            upsert(dto.h3, ownerId: dto.owner, score: dto.claimScore, isHome: dto.isHome, now: dto.lastDrivenAt)
+        }
+    }
+
     // MARK: home hex
 
     /// every home hex owned by someone other than the local player

@@ -5,6 +5,10 @@ import SwiftUI
 struct RootView: View {
     @State private var store: TerritoryStore
     @State private var tracker: DriveTracker
+    /// sign in with Apple flow, shares its Keychain token with sync
+    @State private var signIn: AppleSignInCoordinator
+    /// backend sync
+    @State private var sync: SyncService
 
     /// the post-drive recap surfaces first as a toast, which expands to the full sheet
     @State private var showToast = false
@@ -16,13 +20,32 @@ struct RootView: View {
         let store = TerritoryStore(context: context)
         _store = State(initialValue: store)
         _tracker = State(initialValue: DriveTracker(store: store))
+
+        #if DEBUG
+        #if targetEnvironment(simulator)
+        let config = PocketBaseConfig.localSimulator
+        #else
+        let config = PocketBaseConfig.phoneDevelopment
+        #endif
+        #else
+        let config = PocketBaseConfig.production
+        #endif
+        let tokenStore = KeychainTokenStore()
+        let client = URLSessionPocketBaseClient(config: config, tokenStore: tokenStore)
+        _signIn = State(initialValue: AppleSignInCoordinator(client: client, tokenStore: tokenStore))
+        _sync = State(initialValue: SyncService(store: store, context: context, config: config, tokenStore: tokenStore))
     }
 
     var body: some View {
-        if store.needsOnboarding {
-            OnboardingView(store: store)
-        } else {
-            mapContent
+        Group {
+            if store.needsOnboarding {
+                OnboardingView(store: store, signIn: signIn, sync: sync)
+            } else {
+                mapContent
+            }
+        }
+        .task {
+            await sync.restoreSessionIfPossible()
         }
     }
 
@@ -31,21 +54,27 @@ struct RootView: View {
             .ignoresSafeArea()
             .overlay(alignment: .top) { toast }
             .overlay(alignment: .bottom) { controlPanel }
-            .task { tracker.start() }
+            .task {
+                tracker.start()
+                await sync.pollTiles()
+            }
             .onChange(of: tracker.lastDriveSummary) { _, summary in
                 guard summary != nil else { return }
                 presentToast()
+                Task { await sync.uploadPending() } // push the finished drive
             }
             .sheet(isPresented: $showSummarySheet) {
                 if let summary = tracker.lastDriveSummary {
                     DriveSummaryView(summary: summary, store: store) { showSummarySheet = false }
                         .presentationDetents([.medium, .large])
+                        .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                         .presentationDragIndicator(.visible)
                 }
             }
             .sheet(isPresented: $showHistory) {
                 DriveHistoryView(store: store) { showHistory = false }
                     .presentationDetents([.medium, .large])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationDragIndicator(.visible)
             }
     }
@@ -110,7 +139,24 @@ struct RootView: View {
                     Image(systemName: "chart.bar.xaxis")
                 }
                 .buttonStyle(.plain)
+                .controlPanelIconButton()
                 .accessibilityLabel("Drive history and empire stats")
+
+                #if DEBUG
+                Divider().frame(height: 18)
+                Button {
+                    Task {
+                        await sync.devSignIn()
+                        await sync.uploadPending()
+                    }
+                } label: {
+                    Image(systemName: sync.isSignedIn ? "icloud.fill" : "icloud.slash")
+                        .foregroundStyle(sync.isSignedIn ? .green : .secondary)
+                }
+                .buttonStyle(.plain)
+                .controlPanelIconButton()
+                .accessibilityLabel("Dev sign in and sync")
+                #endif
             }
             .font(.subheadline.weight(.medium))
             .padding(.horizontal, 18)
@@ -123,10 +169,12 @@ struct RootView: View {
                 Label(tracker.isRecording ? "Stop Drive" : "Start Drive",
                       systemImage: tracker.isRecording ? "stop.fill" : "play.fill")
                     .font(.headline)
+                    .frame(minHeight: 44)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 8)
             }
             .driveButtonStyle(recording: tracker.isRecording)
+            .contentShape(Capsule())
         }
         .padding()
     }
@@ -177,13 +225,12 @@ private extension View {
     @ViewBuilder
     func glassCapsule() -> some View {
         if #available(iOS 26, *) {
-            glassEffect(.regular, in: .capsule)
+            glassEffect(.regular.interactive(), in: .capsule)
         } else {
             background(.ultraThinMaterial, in: Capsule())
         }
     }
 
-    // TODO: Liquid ass needs more work!
     @ViewBuilder
     func driveButtonStyle(recording: Bool) -> some View {
         if #available(iOS 26, *) {
@@ -191,6 +238,11 @@ private extension View {
         } else {
             buttonStyle(.borderedProminent).tint(recording ? .red : .blue)
         }
+    }
+
+    func controlPanelIconButton() -> some View {
+        frame(width: 44, height: 44)
+            .contentShape(Circle())
     }
 }
 

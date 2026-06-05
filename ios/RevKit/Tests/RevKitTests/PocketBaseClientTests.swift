@@ -1,0 +1,137 @@
+import Foundation
+import Testing
+@testable import RevKit
+
+/// tests the real `URLSessionPocketBaseClient` against a mock transport
+struct PocketBaseClientTests {
+    private func makeClient(_ transport: MockHTTPTransport, token: String? = "tok") -> URLSessionPocketBaseClient {
+        URLSessionPocketBaseClient(
+            config: PocketBaseConfig(baseURL: URL(string: "https://api.test")!, appleRedirectURL: "https://api.test/redir"),
+            transport: transport,
+            tokenStore: InMemoryTokenStore(token: token)
+        )
+    }
+
+    @Test func createDriveBuildsAuthedPostWithStringKeyedScores() async throws {
+        let respBody = Data(#"{"id":"abc123","created":"2026-06-04 12:00:00.000Z"}"#.utf8)
+        let transport = MockHTTPTransport { _ in (respBody, httpResponse(200)) }
+        let client = makeClient(transport)
+
+        let cell = SyncFixtures.cell
+        let payload = DriveUploadPayload(
+            user: "user1",
+            startedAt: Date(timeIntervalSince1970: 1_000_000),
+            endedAt: Date(timeIntervalSince1970: 1_000_100),
+            rawPath: [GPSSample(timestamp: Date(timeIntervalSince1970: 1_000_000), lat: 41.88, lng: -87.62, speed: 10, accuracy: 5)],
+            perTileScores: [cell: 32.5]
+        )
+
+        let dto = try await client.createDrive(payload)
+        #expect(dto.id == "abc123")
+
+        let req = try #require(transport.requests.first)
+        #expect(req.httpMethod == "POST")
+        #expect(req.url?.path == "/api/collections/drives/records")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "tok")
+
+        // this tests exactness
+        let json = try JSONSerialization.jsonObject(with: try #require(req.httpBody)) as? [String: Any]
+        #expect(json?["user"] as? String == "user1")
+        #expect(json?["raw_path"] != nil)
+        let scores = json?["per_tile_scores"] as? [String: Any]
+        #expect(scores?["\(cell)"] as? Double == 32.5)
+    }
+
+    @Test func listTilesAddsUpdatedFilterAndDecodesStringH3() async throws {
+        let cell = SyncFixtures.cell
+        let listJSON = """
+        {"page":1,"perPage":500,"totalItems":1,"totalPages":1,"items":[
+          {"id":"t1","h3":"\(cell)","owner":"u2","claim_score":40.5,"last_driven_at":"2026-06-01 09:00:00.000Z","is_home":false,"updated":"2026-06-02 09:00:00.000Z"}
+        ]}
+        """
+        let transport = MockHTTPTransport { _ in (Data(listJSON.utf8), httpResponse(200)) }
+        let client = makeClient(transport)
+
+        let tiles = try await client.listTiles(updatedSince: Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(tiles.count == 1)
+        let tile = try #require(tiles.first)
+        #expect(tile.h3 == cell) // string -> uint64, no precision loss
+        #expect(tile.owner == "u2")
+        #expect(tile.claimScore == 40.5)
+        #expect(tile.isHome == false)
+
+        let url = try #require(transport.requests.first?.url?.absoluteString)
+        #expect(url.contains("/api/collections/tiles/records"))
+        #expect(url.contains("filter"))
+        #expect(url.contains("updated"))
+    }
+
+    @Test func listTilesWithoutCursorOmitsFilter() async throws {
+        let empty = Data(#"{"page":1,"perPage":500,"totalItems":0,"totalPages":0,"items":[]}"#.utf8)
+        let transport = MockHTTPTransport { _ in (empty, httpResponse(200)) }
+        let client = makeClient(transport)
+
+        _ = try await client.listTiles(updatedSince: nil)
+        let url = try #require(transport.requests.first?.url?.absoluteString)
+        #expect(!url.contains("filter"))
+    }
+
+    @Test func authWithApplePostsProviderAndCode() async throws {
+        let authJSON = #"{"token":"sess-token","record":{"id":"u9","email":"a@b.com","display_name":"Ann"}}"#
+        let transport = MockHTTPTransport { _ in (Data(authJSON.utf8), httpResponse(200)) }
+        let client = makeClient(transport, token: nil)
+
+        let resp = try await client.authWithApple(authorizationCode: "apple-code", fullName: "Ann")
+        #expect(resp.token == "sess-token")
+        #expect(resp.record.id == "u9")
+
+        let req = try #require(transport.requests.first)
+        #expect(req.url?.path == "/api/collections/users/auth-with-oauth2")
+        let json = try JSONSerialization.jsonObject(with: try #require(req.httpBody)) as? [String: Any]
+        #expect(json?["provider"] as? String == "apple")
+        #expect(json?["code"] as? String == "apple-code")
+    }
+
+    @Test func authRefreshPostsWithBearerToken() async throws {
+        let authJSON = #"{"token":"fresh-token","record":{"id":"u9","email":"a@b.com","display_name":"Ann"}}"#
+        let transport = MockHTTPTransport { _ in (Data(authJSON.utf8), httpResponse(200)) }
+        let client = makeClient(transport, token: "old-token")
+
+        let resp = try await client.authRefresh()
+        #expect(resp.token == "fresh-token")
+        #expect(resp.record.id == "u9")
+
+        let req = try #require(transport.requests.first)
+        #expect(req.httpMethod == "POST")
+        #expect(req.url?.path == "/api/collections/users/auth-refresh")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "old-token")
+    }
+
+    @Test func authWithInvitePostsInfoAndCode() async throws {
+        let authJSON = #"{"token":"invite-token","record":{"id":"u10","email":"cam@example.com","display_name":"Cam"}}"#
+        let transport = MockHTTPTransport { _ in (Data(authJSON.utf8), httpResponse(200)) }
+        let client = makeClient(transport, token: nil)
+
+        let resp = try await client.authWithInvite(displayName: "Cam", email: "cam@example.com", code: "loop-1")
+        #expect(resp.token == "invite-token")
+        #expect(resp.record.id == "u10")
+
+        let req = try #require(transport.requests.first)
+        #expect(req.httpMethod == "POST")
+        #expect(req.url?.path == "/api/rev/auth-with-invite")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
+
+        let json = try JSONSerialization.jsonObject(with: try #require(req.httpBody)) as? [String: Any]
+        #expect(json?["display_name"] as? String == "Cam")
+        #expect(json?["email"] as? String == "cam@example.com")
+        #expect(json?["code"] as? String == "loop-1")
+    }
+
+    @Test func non2xxThrowsHTTPError() async throws {
+        let transport = MockHTTPTransport { _ in (Data(#"{"message":"bad"}"#.utf8), httpResponse(400)) }
+        let client = makeClient(transport)
+        await #expect(throws: PocketBaseError.self) {
+            _ = try await client.listTiles(updatedSince: nil)
+        }
+    }
+}
