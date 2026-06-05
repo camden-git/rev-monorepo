@@ -16,6 +16,8 @@ struct RootView: View {
     @State private var showHistory = false
     @State private var showLeaderboard = false
     @State private var showSettings = false
+    /// the hex inspector sheet, non-nil while a tapped tile is shown
+    @State private var selectedTile: HexTileDetail?
     @State private var toastTask: Task<Void, Never>?
     @State private var visibleTileSyncTask: Task<Void, Never>?
 
@@ -53,9 +55,12 @@ struct RootView: View {
     }
 
     private var mapContent: some View {
-        HexMapView(store: store, breadcrumb: tracker.drivePath) { cells in
-            scheduleVisibleTileSync(cells)
-        }
+        HexMapView(
+            store: store,
+            breadcrumb: tracker.drivePath,
+            onVisibleCellsChange: { cells in scheduleVisibleTileSync(cells) },
+            onSelectTile: { tile in selectedTile = tile }
+        )
             .ignoresSafeArea()
             .overlay(alignment: .top) { toast }
             .overlay(alignment: .topTrailing) { navCluster }
@@ -91,6 +96,12 @@ struct RootView: View {
             .sheet(isPresented: $showSettings) {
                 ProfileSettingsView(store: store, sync: sync) { showSettings = false }
                     .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(item: $selectedTile) { tile in
+                TileDetailView(detail: tile) { selectedTile = nil }
+                    .presentationDetents([.height(340), .medium])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .height(340)))
                     .presentationDragIndicator(.visible)
             }
     }

@@ -3,24 +3,64 @@ import MapKit
 import SwiftUI
 import SwiftyH3
 
+/// a tapped hex, distilled into what the inspector sheet needs to render
+public struct HexTileDetail: Identifiable, Equatable, Sendable {
+    /// the H3 cell index, also sheet identity
+    public let id: UInt64
+    public let ownerName: String?
+    public let ownerColorHex: String?
+    public let isLocalOwner: Bool
+    public let isHome: Bool
+    /// decayed score "right now"
+    public let effectiveScore: Double?
+    /// the score it was last claimed at, before decay
+    public let claimScore: Double?
+    public let lastDrivenAt: Date?
+
+    public var isClaimed: Bool { ownerName != nil }
+
+    public init(
+        id: UInt64,
+        ownerName: String?,
+        ownerColorHex: String?,
+        isLocalOwner: Bool,
+        isHome: Bool,
+        effectiveScore: Double?,
+        claimScore: Double?,
+        lastDrivenAt: Date?
+    ) {
+        self.id = id
+        self.ownerName = ownerName
+        self.ownerColorHex = ownerColorHex
+        self.isLocalOwner = isLocalOwner
+        self.isHome = isHome
+        self.effectiveScore = effectiveScore
+        self.claimScore = claimScore
+        self.lastDrivenAt = lastDrivenAt
+    }
+}
+
 /// MapKit map with the H3 res-10 grid overlay
 public struct HexMapView: UIViewRepresentable {
     private let store: TerritoryStore
     private let breadcrumb: [CLLocationCoordinate2D]
     private let onVisibleCellsChange: @MainActor (Set<UInt64>) -> Void
+    private let onSelectTile: @MainActor (HexTileDetail) -> Void
 
     public init(
         store: TerritoryStore,
         breadcrumb: [CLLocationCoordinate2D] = [],
-        onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void = { _ in }
+        onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void = { _ in },
+        onSelectTile: @escaping @MainActor (HexTileDetail) -> Void = { _ in }
     ) {
         self.store = store
         self.breadcrumb = breadcrumb
         self.onVisibleCellsChange = onVisibleCellsChange
+        self.onSelectTile = onSelectTile
     }
 
     public func makeCoordinator() -> Coordinator {
-        Coordinator(store: store, onVisibleCellsChange: onVisibleCellsChange)
+        Coordinator(store: store, onVisibleCellsChange: onVisibleCellsChange, onSelectTile: onSelectTile)
     }
 
     public func makeUIView(context: Context) -> MKMapView {
@@ -65,6 +105,8 @@ public struct HexMapView: UIViewRepresentable {
     public final class Coordinator: NSObject, MKMapViewDelegate {
         private let store: TerritoryStore
         private let onVisibleCellsChange: @MainActor (Set<UInt64>) -> Void
+        private let onSelectTile: @MainActor (HexTileDetail) -> Void
+        private let selectionHaptics = UISelectionFeedbackGenerator()
         weak var mapView: MKMapView?
 
         private var gridOverlay: MKMultiPolygon?
@@ -78,9 +120,14 @@ public struct HexMapView: UIViewRepresentable {
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
 
-        init(store: TerritoryStore, onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void) {
+        init(
+            store: TerritoryStore,
+            onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void,
+            onSelectTile: @escaping @MainActor (HexTileDetail) -> Void
+        ) {
             self.store = store
             self.onVisibleCellsChange = onVisibleCellsChange
+            self.onSelectTile = onSelectTile
         }
 
         // MARK: grid
@@ -198,7 +245,8 @@ public struct HexMapView: UIViewRepresentable {
 
         // MARK: tap to inspect
 
-        /// tap a hex to see who owns it and at what (decayed) score. REF: docs/tech-stack.md
+        /// tap a hex to see who owns it and at what (decayed) score, via an
+        /// inspector sheet owned by SwiftUI REF: docs/tech-stack.md
         /// §Map Rendering — tap handling.
         @MainActor
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -207,20 +255,33 @@ public struct HexMapView: UIViewRepresentable {
             let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
             guard let cell = H3Grid.cell(for: coordinate) else { return }
 
-            let title: String
-            let message: String
-            if let owner = store.owner(of: cell.id), let effective = store.effectiveScore(of: cell.id) {
-                title = owner.displayName
-                let home = (store.tiles[cell.id]?.isHome ?? false) ? " · home" : ""
-                message = String(format: "%.0f mph effective%@", effective, home)
+            let detail: HexTileDetail
+            if let owner = store.owner(of: cell.id), let state = store.tiles[cell.id] {
+                detail = HexTileDetail(
+                    id: cell.id,
+                    ownerName: owner.displayName,
+                    ownerColorHex: owner.colorHex,
+                    isLocalOwner: owner.isLocal,
+                    isHome: state.isHome,
+                    effectiveScore: store.effectiveScore(of: cell.id),
+                    claimScore: state.claimScore,
+                    lastDrivenAt: state.lastDrivenAt
+                )
             } else {
-                title = "Unclaimed"
-                message = "No owner yet"
+                detail = HexTileDetail(
+                    id: cell.id,
+                    ownerName: nil,
+                    ownerColorHex: nil,
+                    isLocalOwner: false,
+                    isHome: false,
+                    effectiveScore: nil,
+                    claimScore: nil,
+                    lastDrivenAt: nil
+                )
             }
 
-            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            mapView.window?.rootViewController?.present(alert, animated: true)
+            selectionHaptics.selectionChanged()
+            onSelectTile(detail)
         }
 
         // MARK: rendering
