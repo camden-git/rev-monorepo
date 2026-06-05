@@ -67,6 +67,25 @@ struct TileSyncEngineTests {
         #expect(cursor.lastSync == Date(timeIntervalSince1970: 1_700_000_000))
     }
 
+    @Test func visibleCellSyncFetchesOnlyRequestedCellsWithoutAdvancingCursor() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        let cell = SyncFixtures.cell &+ 7100
+        let updated = Date(timeIntervalSince1970: 1_700_001_000)
+        client.onListTilesForCells = { cells in
+            cells.contains(cell) ? [makeTileDTO(cell, owner: "visible-rival", score: 12, updated: updated)] : []
+        }
+
+        let cursor = InMemorySyncCursor(lastSync: Date(timeIntervalSince1970: 1_700_000_000))
+        let engine = TileSyncEngine(client: client, store: store, cursor: cursor)
+        let count = try await engine.sync(h3Cells: [cell])
+
+        #expect(count == 1)
+        #expect(client.listCellArgs.last == [cell])
+        #expect(cursor.lastSync == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(store.tiles[cell]?.ownerId == "visible-rival")
+    }
+
     // MARK: identity reconciliation
 
     @Test func reconcileLocalIdentityRepointsLocalTiles() async throws {

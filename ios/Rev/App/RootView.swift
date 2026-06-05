@@ -17,6 +17,7 @@ struct RootView: View {
     @State private var showLeaderboard = false
     @State private var showSettings = false
     @State private var toastTask: Task<Void, Never>?
+    @State private var visibleTileSyncTask: Task<Void, Never>?
 
     init(context: ModelContext) {
         let store = TerritoryStore(context: context)
@@ -52,14 +53,15 @@ struct RootView: View {
     }
 
     private var mapContent: some View {
-        HexMapView(store: store, breadcrumb: tracker.drivePath)
+        HexMapView(store: store, breadcrumb: tracker.drivePath) { cells in
+            scheduleVisibleTileSync(cells)
+        }
             .ignoresSafeArea()
             .overlay(alignment: .top) { toast }
             .overlay(alignment: .topTrailing) { navCluster }
             .overlay(alignment: .bottom) { controlPanel }
             .task {
                 tracker.start()
-                await sync.pollTiles()
             }
             .onChange(of: tracker.lastDriveSummary) { _, summary in
                 guard summary != nil else { return }
@@ -100,6 +102,15 @@ struct RootView: View {
             try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled else { return }
             withAnimation { showToast = false }
+        }
+    }
+
+    private func scheduleVisibleTileSync(_ cells: Set<UInt64>) {
+        visibleTileSyncTask?.cancel()
+        visibleTileSyncTask = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            await sync.pollVisibleTiles(h3Cells: cells)
         }
     }
 

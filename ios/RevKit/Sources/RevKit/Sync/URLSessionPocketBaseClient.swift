@@ -65,19 +65,33 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
     }
 
     public func listTiles(updatedSince: Date?) async throws -> [TileDTO] {
-        var items = URLQueryItem(name: "perPage", value: "500")
-        var queryItems = [items]
+        var queryItems = [URLQueryItem(name: "perPage", value: "500")]
         if let updatedSince {
             // quote the datetime literal
             let filter = "updated >= \"\(PocketBaseCoding.filterString(for: updatedSince))\""
             queryItems.append(URLQueryItem(name: "filter", value: filter))
         }
-        items = URLQueryItem(name: "sort", value: "updated")
-        queryItems.append(items)
+        queryItems.append(URLQueryItem(name: "sort", value: "updated"))
 
-        let request = makeRequest(path: "/api/collections/tiles/records", method: "GET", authed: true, query: queryItems)
-        let response = try await send(request, decoding: ListResponse<TileDTO>.self)
-        return response.items
+        return try await listAllTilePages(queryItems: queryItems)
+    }
+
+    public func listTiles(h3Cells: Set<UInt64>) async throws -> [TileDTO] {
+        guard !h3Cells.isEmpty else { return [] }
+
+        var tiles: [TileDTO] = []
+        for chunk in Array(h3Cells).chunked(into: 80) {
+            let filter = chunk
+                .map { "h3 = \"\($0)\"" }
+                .joined(separator: " || ")
+            let queryItems = [
+                URLQueryItem(name: "perPage", value: "500"),
+                URLQueryItem(name: "filter", value: filter),
+                URLQueryItem(name: "sort", value: "updated"),
+            ]
+            tiles.append(contentsOf: try await listAllTilePages(queryItems: queryItems))
+        }
+        return tiles
     }
 
     public func listUsers() async throws -> [PlayerDTO] {
@@ -124,6 +138,31 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
             return try decoder.decode(T.self, from: data)
         } catch {
             throw PocketBaseError.decoding(String(describing: error))
+        }
+    }
+
+    private func listAllTilePages(queryItems: [URLQueryItem]) async throws -> [TileDTO] {
+        var page = 1
+        var all: [TileDTO] = []
+        while true {
+            var paged = queryItems
+            paged.append(URLQueryItem(name: "page", value: "\(page)"))
+            let request = makeRequest(path: "/api/collections/tiles/records", method: "GET", authed: true, query: paged)
+            let response = try await send(request, decoding: ListResponse<TileDTO>.self)
+            all.append(contentsOf: response.items)
+
+            guard response.totalPages > page else { break }
+            page += 1
+        }
+        return all
+    }
+}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
         }
     }
 }

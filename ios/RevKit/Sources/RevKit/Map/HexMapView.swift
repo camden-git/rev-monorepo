@@ -7,14 +7,20 @@ import SwiftyH3
 public struct HexMapView: UIViewRepresentable {
     private let store: TerritoryStore
     private let breadcrumb: [CLLocationCoordinate2D]
+    private let onVisibleCellsChange: @MainActor (Set<UInt64>) -> Void
 
-    public init(store: TerritoryStore, breadcrumb: [CLLocationCoordinate2D] = []) {
+    public init(
+        store: TerritoryStore,
+        breadcrumb: [CLLocationCoordinate2D] = [],
+        onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void = { _ in }
+    ) {
         self.store = store
         self.breadcrumb = breadcrumb
+        self.onVisibleCellsChange = onVisibleCellsChange
     }
 
     public func makeCoordinator() -> Coordinator {
-        Coordinator(store: store)
+        Coordinator(store: store, onVisibleCellsChange: onVisibleCellsChange)
     }
 
     public func makeUIView(context: Context) -> MKMapView {
@@ -48,26 +54,31 @@ public struct HexMapView: UIViewRepresentable {
 
     public final class Coordinator: NSObject, MKMapViewDelegate {
         private let store: TerritoryStore
+        private let onVisibleCellsChange: @MainActor (Set<UInt64>) -> Void
         weak var mapView: MKMapView?
 
         private var gridOverlay: MKMultiPolygon?
         /// one overlay per player; the value's identity is matched in `rendererFor`.
         private var playerOverlays: [String: MKMultiPolygon] = [:]
+        private var visibleClaimCells: Set<UInt64> = []
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
         private var breadcrumbOverlay: MKPolyline?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
 
-        init(store: TerritoryStore) {
+        init(store: TerritoryStore, onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void) {
             self.store = store
+            self.onVisibleCellsChange = onVisibleCellsChange
         }
 
         // MARK: grid
 
+        @MainActor
         func rebuildGrid() {
             guard let mapView else { return }
             let cells = H3Grid.coveringCells(for: mapView.region)
+            updateVisibleCells(for: mapView.region)
             if let gridOverlay { mapView.removeOverlay(gridOverlay) }
             let overlay = H3Grid.gridOverlay(for: cells)
             gridOverlay = overlay
@@ -78,12 +89,12 @@ public struct HexMapView: UIViewRepresentable {
         @MainActor
         func syncClaimedOverlay() {
             guard let mapView else { return }
-            // remove and rebuild every player's overlay. fine at friend-group scale; REF:
-            // docs/tech-stack.md §Map Rendering notes the MKTileOverlay path for >~10k hexes.
+            // remove and rebuild the visible slice of each player's overlay
             for overlay in playerOverlays.values { mapView.removeOverlay(overlay) }
             playerOverlays.removeAll()
             for player in store.players {
-                guard let overlay = H3Grid.claimedOverlay(for: store.cells(ownedBy: player.id)) else { continue }
+                let cells = store.cells(ownedBy: player.id, within: visibleClaimCells)
+                guard let overlay = H3Grid.claimedOverlay(for: cells) else { continue }
                 playerOverlays[player.id] = overlay
                 mapView.addOverlay(overlay)
             }
@@ -111,9 +122,20 @@ public struct HexMapView: UIViewRepresentable {
             mapView.addOverlay(line)
         }
 
+        @MainActor
+        private func updateVisibleCells(for region: MKCoordinateRegion) {
+            let cells = H3Grid.visibleCellIds(for: region)
+            guard cells != visibleClaimCells else { return }
+            visibleClaimCells = cells
+            syncClaimedOverlay()
+            onVisibleCellsChange(cells)
+        }
+
         public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             rebuildItem?.cancel()
-            let item = DispatchWorkItem { [weak self] in self?.rebuildGrid() }
+            let item = DispatchWorkItem { [weak self] in
+                Task { @MainActor in self?.rebuildGrid() }
+            }
             rebuildItem = item
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: item)
         }

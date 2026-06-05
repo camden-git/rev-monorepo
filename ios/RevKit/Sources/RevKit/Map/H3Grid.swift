@@ -9,8 +9,9 @@ public enum H3Grid {
     /// an approximation of res-10 hexagon edge length in meters
     static let edgeMeters: Double = 65
 
-    /// below this many cellsthe grid is drawn
+    /// below this many cells the grid is drawn
     static let maxGridCells = 1800
+    static let maxVisibleTileCells = 5000
 
     /// the res-10 cell containing a coordinate, nil if conversion fails
     static func cell(for coordinate: CLLocationCoordinate2D) -> H3Cell? {
@@ -25,7 +26,7 @@ public enum H3Grid {
     /// res-10 cells covering (roughly) the visible region: the center cell expanded by a grid
     /// disk whose radius is derived from the region's diagonal reach
     /// returns [] when zoomed out past the cell cap
-    static func coveringCells(for region: MKCoordinateRegion) -> [H3Cell] {
+    static func coveringCells(for region: MKCoordinateRegion, paddingRings: Int32 = 0, maxCells: Int = maxGridCells) -> [H3Cell] {
         guard let center = cell(for: region.center) else { return [] }
 
         // meters, north-south and east-west
@@ -35,14 +36,18 @@ public enum H3Grid {
         let halfDiagonal = hypot(latMeters, lngMeters) / 2
 
         // each disk ring step covers ~one hex edge of additional reach
-        let radius = Int32((halfDiagonal / edgeMeters).rounded(.up))
+        let radius = Int32((halfDiagonal / edgeMeters).rounded(.up)) + Swift.max(0, paddingRings)
         guard radius >= 1 else { return [center] }
 
         // cells in a grid disk of radius k is 3k(k+1)+1
         let estimated = 3 * Int(radius) * (Int(radius) + 1) + 1
-        guard estimated <= maxGridCells else { return [] }
+        guard estimated <= maxCells else { return [] }
 
         return (try? center.gridDisk(distance: radius)) ?? [center]
+    }
+
+    static func visibleCellIds(for region: MKCoordinateRegion, paddingRings: Int32 = 2) -> Set<UInt64> {
+        Set(coveringCells(for: region, paddingRings: paddingRings, maxCells: maxVisibleTileCells).map(\.id))
     }
 
     /// outline per hex

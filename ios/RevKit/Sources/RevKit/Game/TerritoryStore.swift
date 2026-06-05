@@ -295,6 +295,13 @@ public final class TerritoryStore {
         Set(tiles.filter { $0.value.ownerId == id }.keys)
     }
 
+    public func cells(ownedBy id: String, within visibleCells: Set<UInt64>) -> Set<UInt64> {
+        guard !visibleCells.isEmpty else { return [] }
+        return Set(tiles.compactMap { cell, state in
+            state.ownerId == id && visibleCells.contains(cell) ? cell : nil
+        })
+    }
+
     public func player(id: String) -> Player? {
         players.first { $0.id == id }
     }

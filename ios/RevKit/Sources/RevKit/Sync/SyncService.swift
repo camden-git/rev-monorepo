@@ -15,6 +15,7 @@ public final class SyncService {
     public private(set) var currentUserId: String?
     public private(set) var lastError: String?
     private var attemptedSessionRestore = false
+    private var currentVisibleTileCells: Set<UInt64> = []
 
     public convenience init(
         store: TerritoryStore,
@@ -97,7 +98,9 @@ public final class SyncService {
         let source = SwiftDataDriveSource(context: context, userID: userId)
         let queue = DriveUploadQueue(client: client, source: source)
         let result = await queue.drain()
-        if result.uploaded > 0 { await pollTiles() }
+        if result.uploaded > 0, !currentVisibleTileCells.isEmpty {
+            await pollVisibleTiles(h3Cells: currentVisibleTileCells)
+        }
     }
 
     /// foreground delta-poll
@@ -110,6 +113,18 @@ public final class SyncService {
             return
         }
         await syncRoster()
+    }
+
+    /// map-window tile refresh, driven by the visible H3 cells plus padding
+    public func pollVisibleTiles(h3Cells: Set<UInt64>) async {
+        guard !h3Cells.isEmpty else { return }
+        currentVisibleTileCells = h3Cells
+        do {
+            _ = try await TileSyncEngine(client: client, store: store, cursor: cursor).sync(h3Cells: h3Cells)
+            lastError = nil
+        } catch {
+            lastError = String(describing: error)
+        }
     }
 
     /// pull the player roster into the local `Player` table

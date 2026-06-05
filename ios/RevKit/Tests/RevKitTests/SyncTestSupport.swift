@@ -37,6 +37,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         DriveRecordDTO(id: "rec", created: nil)
     }
     var onListTiles: @Sendable (Date?) throws -> [TileDTO] = { _ in [] }
+    var onListTilesForCells: @Sendable (Set<UInt64>) throws -> [TileDTO] = { _ in [] }
     var onAuth: @Sendable (String, String?) throws -> AuthResponse = { _, _ in
         AuthResponse(token: "tok", record: AuthUserDTO(id: "u", email: nil, displayName: nil))
     }
@@ -51,6 +52,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
 
     private(set) var createdPayloads: [DriveUploadPayload] = []
     private(set) var listSinceArgs: [Date?] = []
+    private(set) var listCellArgs: [Set<UInt64>] = []
     private(set) var listUsersCallCount = 0
     private(set) var profileUpdates: [(userId: String, homeH3: UInt64, color: String, displayName: String)] = []
 
@@ -78,6 +80,11 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     func listTiles(updatedSince: Date?) async throws -> [TileDTO] {
         lock.withLock { listSinceArgs.append(updatedSince) }
         return try onListTiles(updatedSince)
+    }
+
+    func listTiles(h3Cells: Set<UInt64>) async throws -> [TileDTO] {
+        lock.withLock { listCellArgs.append(h3Cells) }
+        return try onListTilesForCells(h3Cells)
     }
 
     func listUsers() async throws -> [PlayerDTO] {
