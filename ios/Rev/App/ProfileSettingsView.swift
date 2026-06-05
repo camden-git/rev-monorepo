@@ -1,5 +1,6 @@
 import RevKit
 import SwiftUI
+import UIKit
 
 /// edit the local player's display name + map color and push to server
 struct ProfileSettingsView: View {
@@ -32,9 +33,13 @@ struct ProfileSettingsView: View {
                 Section { preview }
 
                 Section("Display Name") {
-                    TextField("Name", text: $name)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
+                    ResponsiveTextField(
+                        "Name",
+                        text: $name,
+                        textContentType: .name,
+                        autocapitalizationType: .words,
+                        autocorrectionType: .no
+                    )
                 }
 
                 Section("Map Color") {
@@ -132,6 +137,103 @@ struct ProfileSettingsView: View {
             onDone()
         } else {
             saveError = sync.lastError ?? "Couldn't sync your profile. Try again."
+        }
+    }
+}
+
+/// UIKit keeps editing responsive even when the surrounding SwiftUI view is doing
+/// extra work for previews, toolbar state, or form layout on each character
+struct ResponsiveTextField: UIViewRepresentable {
+    let placeholder: String
+    @Binding var text: String
+    var textContentType: UITextContentType?
+    var keyboardType: UIKeyboardType = .default
+    var autocapitalizationType: UITextAutocapitalizationType = .sentences
+    var autocorrectionType: UITextAutocorrectionType = .default
+    var returnKeyType: UIReturnKeyType = .default
+    var borderStyle: UITextField.BorderStyle = .none
+    var onSubmit: (() -> Void)?
+
+    init(
+        _ placeholder: String,
+        text: Binding<String>,
+        textContentType: UITextContentType? = nil,
+        keyboardType: UIKeyboardType = .default,
+        autocapitalizationType: UITextAutocapitalizationType = .sentences,
+        autocorrectionType: UITextAutocorrectionType = .default,
+        returnKeyType: UIReturnKeyType = .default,
+        borderStyle: UITextField.BorderStyle = .none,
+        onSubmit: (() -> Void)? = nil
+    ) {
+        self.placeholder = placeholder
+        _text = text
+        self.textContentType = textContentType
+        self.keyboardType = keyboardType
+        self.autocapitalizationType = autocapitalizationType
+        self.autocorrectionType = autocorrectionType
+        self.returnKeyType = returnKeyType
+        self.borderStyle = borderStyle
+        self.onSubmit = onSubmit
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField()
+        textField.delegate = context.coordinator
+        textField.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.editingChanged(_:)),
+            for: .editingChanged
+        )
+        textField.font = .preferredFont(forTextStyle: .body)
+        textField.adjustsFontForContentSizeCategory = true
+        textField.clearButtonMode = .whileEditing
+        configure(textField)
+        textField.text = text
+        return textField
+    }
+
+    func updateUIView(_ textField: UITextField, context: Context) {
+        context.coordinator.parent = self
+        configure(textField)
+        if !textField.isFirstResponder, textField.text != text {
+            textField.text = text
+        }
+    }
+
+    private func configure(_ textField: UITextField) {
+        textField.placeholder = placeholder
+        textField.textContentType = textContentType
+        textField.keyboardType = keyboardType
+        textField.autocapitalizationType = autocapitalizationType
+        textField.autocorrectionType = autocorrectionType
+        textField.returnKeyType = returnKeyType
+        textField.borderStyle = borderStyle
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: ResponsiveTextField
+
+        init(_ parent: ResponsiveTextField) {
+            self.parent = parent
+        }
+
+        @objc func editingChanged(_ textField: UITextField) {
+            let value = textField.text ?? ""
+            if parent.text != value {
+                parent.text = value
+            }
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            parent.onSubmit?()
+            if parent.onSubmit != nil {
+                textField.resignFirstResponder()
+            }
+            return true
         }
     }
 }

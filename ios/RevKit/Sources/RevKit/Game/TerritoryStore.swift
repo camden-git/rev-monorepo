@@ -20,6 +20,8 @@ public final class TerritoryStore {
 
     /// h3 cell -> current state, for both claim resolution and the per-player overlays
     public private(set) var tiles: [UInt64: ClaimResolver.TileState] = [:]
+    @ObservationIgnored private var tileRecords: [UInt64: TileRecord] = [:]
+    @ObservationIgnored private var pendingSaveTask: Task<Void, Never>?
 
     /// true until the local player has chosen a home hex (`homeH3 == 0`)
     public private(set) var needsOnboarding: Bool
@@ -37,7 +39,9 @@ public final class TerritoryStore {
 
         let records = (try? context.fetch(FetchDescriptor<TileRecord>())) ?? []
         for record in records {
-            tiles[record.cellId] = ClaimResolver.TileState(
+            let cellId = record.cellId
+            tileRecords[cellId] = record
+            tiles[cellId] = ClaimResolver.TileState(
                 ownerId: record.ownerId,
                 claimScore: record.claimScore,
                 lastDrivenAt: record.lastDrivenAt,
@@ -134,7 +138,7 @@ public final class TerritoryStore {
         }
 
         localPlayer.id = serverId
-        try? context.save()
+        saveImmediately()
     }
 
     /// upsert the player roster fetched from the server so opponents' tiles render
@@ -159,21 +163,21 @@ public final class TerritoryStore {
                 players.append(player)
             }
         }
-        try? context.save()
+        saveImmediately()
     }
 
     /// adopt the authenticated display name for the local player
     public func setLocalDisplayName(_ name: String) {
         guard !name.isEmpty, localPlayer.displayName != name else { return }
         localPlayer.displayName = name
-        try? context.save()
+        saveImmediately()
     }
 
     /// update the local player's display name + map color from the profile settings screen
     public func updateLocalProfile(displayName: String, colorHex: String) {
         localPlayer.displayName = displayName
         localPlayer.colorHex = colorHex
-        try? context.save()
+        saveImmediately()
         // reassign to nudge @Observable so the map overlay re-renders in the new color
         players = players
     }
@@ -190,35 +194,35 @@ public final class TerritoryStore {
     /// FUTURE (server-side)
     public func establishHome(at cell: UInt64, now: Date = .now) {
         localPlayer.homeH3 = Int64(h3: cell)
-        try? context.save()
         upsert(cell, ownerId: localPlayer.id, score: 0, isHome: true, now: now)
         needsOnboarding = false
+        saveImmediately()
     }
 
     private func upsert(_ cellIndex: UInt64, ownerId: String, score: Double, isHome: Bool, now: Date) {
-        let key = cellIndex.int64Storage
-        let descriptor = FetchDescriptor<TileRecord>(predicate: #Predicate { $0.h3 == key })
-        if let record = try? context.fetch(descriptor).first {
+        if let record = tileRecords[cellIndex] {
             record.ownerId = ownerId
             record.claimScore = score
             record.lastDrivenAt = now
             record.isHome = isHome
         } else {
-            context.insert(TileRecord(
+            let record = TileRecord(
                 h3: cellIndex,
                 ownerId: ownerId,
                 claimScore: score,
                 lastDrivenAt: now,
                 isHome: isHome
-            ))
+            )
+            context.insert(record)
+            tileRecords[cellIndex] = record
         }
-        try? context.save()
         tiles[cellIndex] = ClaimResolver.TileState(
             ownerId: ownerId,
             claimScore: score,
             lastDrivenAt: now,
             isHome: isHome
         )
+        scheduleSave()
     }
 
     /// persist a finished drive (with its provisional summary) so it survives relaunch and is ready
@@ -228,6 +232,22 @@ public final class TerritoryStore {
     /// the authoritative result and this record's summary is replaced
     public func record(_ drive: Drive, summary: DriveSummary? = nil) {
         context.insert(DriveRecord(drive: drive, summary: summary))
+        saveImmediately()
+    }
+
+    private func scheduleSave() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, let self else { return }
+            pendingSaveTask = nil
+            try? context.save()
+        }
+    }
+
+    private func saveImmediately() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = nil
         try? context.save()
     }
 

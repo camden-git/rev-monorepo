@@ -2,6 +2,7 @@ import CoreLocation
 import MapKit
 import RevKit
 import SwiftUI
+import UIKit
 
 /// first-launch home selection (REF: docs/game-design.md §Home Hex)
 ///
@@ -33,7 +34,7 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             Map(position: $cameraPosition)
-                .onMapCameraChange(frequency: .continuous) { context in
+                .onMapCameraChange(frequency: .onEnd) { context in
                     centerCoordinate = context.region.center
                 }
                 .ignoresSafeArea()
@@ -184,15 +185,30 @@ private struct InviteSignInView: View {
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(.green)
             } else {
-                TextField("Name", text: $displayName)
-                    .textContentType(.name)
-                TextField("Email", text: $email)
-                    .textContentType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                TextField("Invite code", text: $code)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
+                ResponsiveTextField(
+                    "Name",
+                    text: $displayName,
+                    textContentType: .name,
+                    autocapitalizationType: .words,
+                    autocorrectionType: .no,
+                    borderStyle: .roundedRect
+                )
+                ResponsiveTextField(
+                    "Email",
+                    text: $email,
+                    textContentType: .emailAddress,
+                    keyboardType: .emailAddress,
+                    autocapitalizationType: .none,
+                    autocorrectionType: .no,
+                    borderStyle: .roundedRect
+                )
+                ResponsiveTextField(
+                    "Invite code",
+                    text: $code,
+                    autocapitalizationType: .allCharacters,
+                    autocorrectionType: .no,
+                    borderStyle: .roundedRect
+                )
                 Button {
                     Task { await submit() }
                 } label: {

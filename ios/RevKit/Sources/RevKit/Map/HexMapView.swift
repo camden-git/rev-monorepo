@@ -74,6 +74,7 @@ public struct HexMapView: UIViewRepresentable {
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
         private var breadcrumbOverlay: MKPolyline?
+        private var claimedOverlaySignature: ClaimedOverlaySignature?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
 
@@ -99,11 +100,16 @@ public struct HexMapView: UIViewRepresentable {
         @MainActor
         func syncClaimedOverlay() {
             guard let mapView else { return }
+            let signature = makeClaimedOverlaySignature()
+            guard signature != claimedOverlaySignature else { return }
+            claimedOverlaySignature = signature
+
             // remove and rebuild the visible slice of each player's overlay
             for overlay in playerOverlays.values { mapView.removeOverlay(overlay) }
             playerOverlays.removeAll()
+            let cellsByOwner = visibleClaimCellsByOwner()
             for player in store.players {
-                let cells = store.cells(ownedBy: player.id, within: visibleClaimCells)
+                let cells = cellsByOwner[player.id] ?? []
                 guard let overlay = H3Grid.claimedOverlay(for: cells) else { continue }
                 playerOverlays[player.id] = overlay
                 mapView.addOverlay(overlay)
@@ -118,6 +124,37 @@ public struct HexMapView: UIViewRepresentable {
                 homeOverlay = polygon
                 mapView.addOverlay(polygon)
             }
+        }
+
+        private func makeClaimedOverlaySignature() -> ClaimedOverlaySignature {
+            var visibleOwners: [UInt64: String] = [:]
+            visibleOwners.reserveCapacity(Swift.min(visibleClaimCells.count, store.tiles.count))
+            for cell in visibleClaimCells {
+                if let ownerId = store.tiles[cell]?.ownerId {
+                    visibleOwners[cell] = ownerId
+                }
+            }
+
+            var playerColors: [String: String] = [:]
+            playerColors.reserveCapacity(store.players.count)
+            for player in store.players {
+                playerColors[player.id] = player.colorHex
+            }
+            return ClaimedOverlaySignature(
+                visibleOwners: visibleOwners,
+                playerColors: playerColors,
+                localHomeCell: store.localPlayer.homeCell
+            )
+        }
+
+        private func visibleClaimCellsByOwner() -> [String: Set<UInt64>] {
+            var cellsByOwner: [String: Set<UInt64>] = [:]
+            cellsByOwner.reserveCapacity(store.players.count)
+            for cell in visibleClaimCells {
+                guard let ownerId = store.tiles[cell]?.ownerId else { continue }
+                cellsByOwner[ownerId, default: []].insert(cell)
+            }
+            return cellsByOwner
         }
 
         func syncBreadcrumb(_ coordinates: [CLLocationCoordinate2D]) {
@@ -220,6 +257,12 @@ public struct HexMapView: UIViewRepresentable {
                 renderer.lineWidth = 0.75
             }
             return renderer
+        }
+
+        private struct ClaimedOverlaySignature: Equatable {
+            var visibleOwners: [UInt64: String]
+            var playerColors: [String: String]
+            var localHomeCell: UInt64
         }
     }
 }

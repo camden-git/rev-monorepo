@@ -12,10 +12,14 @@ struct DriveHistoryView: View {
     /// the drive whose full recap is being shown
     @State private var selectedDrive: DriveRecord?
 
-    private var stats: EmpireStats { store.empireStats() }
-    private var drives: [DriveRecord] { store.driveHistory() }
-
     var body: some View {
+        let drives = store.driveHistory()
+        let stats = EmpireStats.compute(
+            tiles: Array(store.tiles.values),
+            ownedBy: store.localPlayer.id,
+            driveSummaries: drives.compactMap(\.summary)
+        )
+
         NavigationStack {
             List {
                 Section {
@@ -40,7 +44,7 @@ struct DriveHistoryView: View {
                         Text("\(stats.totalDrives)").monospacedDigit()
                     }
                     LabeledContent("Distance") {
-                        Text(lifetimeDistanceText).monospacedDigit()
+                        Text(lifetimeDistanceText(for: stats)).monospacedDigit()
                     }
                     LabeledContent("Tiles gained") {
                         Text("+\(stats.lifetimeTilesGained)")
@@ -145,7 +149,7 @@ struct DriveHistoryView: View {
         return parts.joined(separator: " · ")
     }
 
-    private var lifetimeDistanceText: String {
+    private func lifetimeDistanceText(for stats: EmpireStats) -> String {
         let miles = stats.lifetimeDistanceMeters / 1609.344
         return String(format: "%.1f mi", miles)
     }
