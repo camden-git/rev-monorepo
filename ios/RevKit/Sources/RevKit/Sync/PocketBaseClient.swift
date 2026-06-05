@@ -24,6 +24,14 @@ public protocol PocketBaseClient: Sendable {
     /// fetch tiles changed since `updatedSince` (nil = full snapshot)
     /// `GET /api/collections/tiles/records?filter=(updated>="…")`
     func listTiles(updatedSince: Date?) async throws -> [TileDTO]
+
+    /// fetch the player roster (every user's public profile)
+    /// `GET /api/collections/users/records`
+    func listUsers() async throws -> [PlayerDTO]
+
+    /// update the signed-in user's own profile (home hex, color, display name)
+    /// `PATCH /api/collections/users/records/{userId}`
+    func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws
 }
 
 /// API connection settings

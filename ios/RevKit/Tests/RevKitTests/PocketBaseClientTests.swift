@@ -127,6 +127,53 @@ struct PocketBaseClientTests {
         #expect(json?["code"] as? String == "loop-1")
     }
 
+    @Test func listUsersDecodesRosterWithStringHomeH3() async throws {
+        let home = SyncFixtures.cell
+        let listJSON = """
+        {"page":1,"perPage":500,"totalItems":2,"totalPages":1,"items":[
+          {"id":"u1","display_name":"Ada","color":"#EF4444","home_h3":"\(home)"},
+          {"id":"u2","display_name":"Owen","color":"#22C55E","home_h3":"0"}
+        ]}
+        """
+        let transport = MockHTTPTransport { _ in (Data(listJSON.utf8), httpResponse(200)) }
+        let client = makeClient(transport)
+
+        let players = try await client.listUsers()
+        #expect(players.count == 2)
+        let ada = try #require(players.first)
+        #expect(ada.id == "u1")
+        #expect(ada.displayName == "Ada")
+        #expect(ada.color == "#EF4444")
+        #expect(ada.homeH3 == home) // string -> uint64, no precision loss
+        #expect(players[1].homeH3 == 0)
+
+        let req = try #require(transport.requests.first)
+        #expect(req.httpMethod == "GET")
+        #expect(req.url?.path == "/api/collections/users/records")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "tok")
+    }
+
+    @Test func updateProfilePatchesOwnRecordWithStringHomeH3() async throws {
+        let home = SyncFixtures.cell
+        let respJSON = """
+        {"id":"u9","display_name":"Cam","color":"#3B82F6","home_h3":"\(home)"}
+        """
+        let transport = MockHTTPTransport { _ in (Data(respJSON.utf8), httpResponse(200)) }
+        let client = makeClient(transport)
+
+        try await client.updateProfile(userId: "u9", homeH3: home, color: "#3B82F6", displayName: "Cam")
+
+        let req = try #require(transport.requests.first)
+        #expect(req.httpMethod == "PATCH")
+        #expect(req.url?.path == "/api/collections/users/records/u9")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "tok")
+
+        let json = try JSONSerialization.jsonObject(with: try #require(req.httpBody)) as? [String: Any]
+        #expect(json?["home_h3"] as? String == "\(home)") // exact, as a decimal string
+        #expect(json?["color"] as? String == "#3B82F6")
+        #expect(json?["display_name"] as? String == "Cam")
+    }
+
     @Test func non2xxThrowsHTTPError() async throws {
         let transport = MockHTTPTransport { _ in (Data(#"{"message":"bad"}"#.utf8), httpResponse(400)) }
         let client = makeClient(transport)

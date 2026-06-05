@@ -3,7 +3,9 @@ import Foundation
 import SwiftData
 import SwiftyH3
 
-/// first-launch seed so the local-only build has real opponents to compete with
+/// first-launch seed so the local-only build has opponents to compete with.
+///
+/// once signed in, real players arrive via `TerritoryStore.applyRemotePlayers` (roster sync)
 ///
 /// everything is positioned relative to the test route (scripts/chicago-drive.gpx), which runs
 /// east along `routeLat`:

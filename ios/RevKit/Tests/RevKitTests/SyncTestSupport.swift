@@ -46,9 +46,13 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     var onInviteAuth: @Sendable (String, String, String) throws -> AuthResponse = { _, _, _ in
         AuthResponse(token: "tok", record: AuthUserDTO(id: "u", email: nil, displayName: nil))
     }
+    var onListUsers: @Sendable () throws -> [PlayerDTO] = { [] }
+    var onUpdateProfile: @Sendable (String, UInt64, String, String) throws -> Void = { _, _, _, _ in }
 
     private(set) var createdPayloads: [DriveUploadPayload] = []
     private(set) var listSinceArgs: [Date?] = []
+    private(set) var listUsersCallCount = 0
+    private(set) var profileUpdates: [(userId: String, homeH3: UInt64, color: String, displayName: String)] = []
 
     func authWithApple(authorizationCode: String, fullName: String?) async throws -> AuthResponse {
         try onAuth(authorizationCode, fullName)
@@ -74,6 +78,16 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     func listTiles(updatedSince: Date?) async throws -> [TileDTO] {
         lock.withLock { listSinceArgs.append(updatedSince) }
         return try onListTiles(updatedSince)
+    }
+
+    func listUsers() async throws -> [PlayerDTO] {
+        lock.withLock { listUsersCallCount += 1 }
+        try onListUsers()
+    }
+
+    func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws {
+        lock.withLock { profileUpdates.append((userId, homeH3, color, displayName)) }
+        try onUpdateProfile(userId, homeH3, color, displayName)
     }
 }
 
@@ -114,4 +128,9 @@ enum SyncFixtures {
 /// `TileDTO` builder usable from `@Sendable` mock closures
 func makeTileDTO(_ h3: UInt64, owner: String, score: Double, updated: Date) -> TileDTO {
     TileDTO(id: "id-\(h3)", h3: h3, owner: owner, claimScore: score, lastDrivenAt: updated, isHome: false, updated: updated)
+}
+
+/// `PlayerDTO` builder usable from `@Sendable` mock closures
+func makePlayerDTO(_ id: String, name: String, color: String, homeH3: UInt64 = 0) -> PlayerDTO {
+    PlayerDTO(id: id, displayName: name, color: color, homeH3: homeH3)
 }

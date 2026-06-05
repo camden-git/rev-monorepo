@@ -80,6 +80,39 @@ public struct TileDTO: Decodable, Sendable, Equatable {
     }
 }
 
+/// a `users` record as returned by the roster list endpoint
+public struct PlayerDTO: Decodable, Sendable, Equatable {
+    public let id: String
+    public let displayName: String
+    public let color: String
+    /// home hex H3 id, `0` means the player hasn't onboarded a home yet
+    public let homeH3: UInt64
+
+    public init(id: String, displayName: String, color: String, homeH3: UInt64) {
+        self.id = id
+        self.displayName = displayName
+        self.color = color
+        self.homeH3 = homeH3
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case displayName = "display_name"
+        case color
+        case homeH3 = "home_h3"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? ""
+        color = try c.decodeIfPresent(String.self, forKey: .color) ?? ""
+        // home_h3 crosses the wire as a decimal string for exactness (same as TileDTO.h3)
+        let homeString = try c.decodeIfPresent(String.self, forKey: .homeH3) ?? "0"
+        homeH3 = UInt64(homeString) ?? 0
+    }
+}
+
 /// PocketBase's paginated list envelope
 public struct ListResponse<Item: Decodable & Sendable>: Decodable, Sendable {
     public let items: [Item]

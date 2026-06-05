@@ -16,10 +16,27 @@ public final class SyncService {
     public private(set) var lastError: String?
     private var attemptedSessionRestore = false
 
-    public init(
+    public convenience init(
         store: TerritoryStore,
         context: ModelContext,
         config: PocketBaseConfig,
+        tokenStore: TokenStore = InMemoryTokenStore(),
+        cursor: SyncCursor = InMemorySyncCursor()
+    ) {
+        self.init(
+            store: store,
+            context: context,
+            client: URLSessionPocketBaseClient(config: config, tokenStore: tokenStore),
+            tokenStore: tokenStore,
+            cursor: cursor
+        )
+    }
+
+    /// designated init taking an explicit client (enables mock-client tests)
+    init(
+        store: TerritoryStore,
+        context: ModelContext,
+        client: PocketBaseClient,
         tokenStore: TokenStore = InMemoryTokenStore(),
         cursor: SyncCursor = InMemorySyncCursor()
     ) {
@@ -27,15 +44,25 @@ public final class SyncService {
         self.context = context
         self.tokenStore = tokenStore
         self.cursor = cursor
-        self.client = URLSessionPocketBaseClient(config: config, tokenStore: tokenStore)
+        self.client = client
     }
 
     public var isSignedIn: Bool { currentUserId != nil }
 
     /// adopt a session from an external auth flow (e.g. Sign in with Apple)
+    /// reconciles the local player's seeded id onto the authenticated PocketBase
+    /// user id so offline-claimed tiles dedupe with the server's view of "me".
     public func adoptSession(_ response: AuthResponse) {
         tokenStore.save(response.token)
         currentUserId = response.record.id
+        store.reconcileLocalIdentity(to: response.record.id)
+        if let name = response.record.displayName { store.setLocalDisplayName(name) }
+    }
+
+    /// roster + profile refresh to run after any successful sign-in:
+    public func refreshAfterSignIn() async {
+        await pushProfile()
+        await syncRoster()
     }
 
     public func restoreSessionIfPossible() async {
@@ -45,6 +72,7 @@ public final class SyncService {
             let response = try await client.authRefresh()
             adoptSession(response)
             lastError = nil
+            await refreshAfterSignIn()
         } catch {
             tokenStore.clear()
             lastError = String(describing: error)
@@ -56,6 +84,7 @@ public final class SyncService {
             let response = try await client.authWithInvite(displayName: displayName, email: email, code: code)
             adoptSession(response)
             lastError = nil
+            await refreshAfterSignIn()
         } catch {
             lastError = String(describing: error)
         }
@@ -78,6 +107,38 @@ public final class SyncService {
             lastError = nil
         } catch {
             lastError = String(describing: error)
+            return
+        }
+        await syncRoster()
+    }
+
+    /// pull the player roster into the local `Player` table
+    public func syncRoster() async {
+        guard currentUserId != nil else { return }
+        do {
+            let players = try await client.listUsers()
+            store.applyRemotePlayers(players)
+            lastError = nil
+        } catch {
+            lastError = String(describing: error)
+        }
+    }
+
+    /// push the local player's profile (home hex, color, name) to their server
+    /// user record so the roster reflects it
+    public func pushProfile() async {
+        guard let userId = currentUserId else { return }
+        let local = store.localPlayer
+        do {
+            try await client.updateProfile(
+                userId: userId,
+                homeH3: local.homeCell,
+                color: local.colorHex,
+                displayName: local.displayName
+            )
+            lastError = nil
+        } catch {
+            lastError = String(describing: error)
         }
     }
 
@@ -88,6 +149,7 @@ public final class SyncService {
             let response = try await client.authWithPassword(identity: identity, password: password)
             adoptSession(response)
             lastError = nil
+            await refreshAfterSignIn()
         } catch {
             lastError = String(describing: error)
         }

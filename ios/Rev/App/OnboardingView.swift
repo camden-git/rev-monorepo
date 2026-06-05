@@ -109,6 +109,7 @@ struct OnboardingView: View {
             // scaffolding lowk
             AppleSignInButton(coordinator: signIn) { response in
                 sync.adoptSession(response)
+                Task { await sync.refreshAfterSignIn() }
             }
         }
         .padding(24)
@@ -154,6 +155,11 @@ struct OnboardingView: View {
             return
         }
         store.establishHome(at: cell)
+        // if the player onboarded while already signed in, push the chosen home
+        // hex to their server record so the roster reflects it
+        if sync.isSignedIn {
+            Task { await sync.pushProfile() }
+        }
     }
 }
 

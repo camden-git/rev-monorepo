@@ -92,12 +92,81 @@ public final class TerritoryStore {
     /// the provisional local resolution for the tiles it returns (REF:
     /// docs/tech-stack.md §Updates to Clients - Polling)
     ///
-    /// FUTURE (server-side): `TileDTO.owner` is a PocketBase user id
-    ///
+    /// `TileDTO.owner` is a PocketBase user id, it lines up with the local player
+    /// only after `reconcileLocalIdentity` has run, and with opponents only after
+    /// `applyRemotePlayers` has seeded their `Player` rows
     public func applyRemoteTiles(_ tiles: [TileDTO]) {
         for dto in tiles {
             upsert(dto.h3, ownerId: dto.owner, score: dto.claimScore, isHome: dto.isHome, now: dto.lastDrivenAt)
         }
+    }
+
+    /// collapse the locally-generated player id (a `UUID` seeded before sign-in)
+    /// onto the authenticated PocketBase user id, re-pointing every tile the local
+    /// player already owns
+    ///
+    /// idempotent: a no-op once `localPlayer.id` already equals `serverId`
+    public func reconcileLocalIdentity(to serverId: String) {
+        let oldId = localPlayer.id
+        guard oldId != serverId else { return }
+
+        // a stale `Player` row may already hold the server id (e.g. seeded by a
+        // prior roster sync)
+        if let duplicate = players.first(where: { $0.id == serverId && $0 !== localPlayer }) {
+            context.delete(duplicate)
+            players.removeAll { $0 === duplicate }
+        }
+
+        // re-point persisted tiles owned by the old local id
+        let descriptor = FetchDescriptor<TileRecord>(predicate: #Predicate { $0.ownerId == oldId })
+        for record in (try? context.fetch(descriptor)) ?? [] {
+            record.ownerId = serverId
+        }
+
+        // re-point the in-memory cache
+        for (cell, state) in tiles where state.ownerId == oldId {
+            tiles[cell] = ClaimResolver.TileState(
+                ownerId: serverId,
+                claimScore: state.claimScore,
+                lastDrivenAt: state.lastDrivenAt,
+                isHome: state.isHome
+            )
+        }
+
+        localPlayer.id = serverId
+        try? context.save()
+    }
+
+    /// upsert the player roster fetched from the server so opponents' tiles render
+    /// with their color + name and tap-inspect resolves them
+    public func applyRemotePlayers(_ remote: [PlayerDTO]) {
+        for dto in remote {
+            if let existing = players.first(where: { $0.id == dto.id }) {
+                if !dto.displayName.isEmpty { existing.displayName = dto.displayName }
+                if !dto.color.isEmpty { existing.colorHex = dto.color }
+                if dto.homeH3 != 0 || existing.homeCell == 0 {
+                    existing.homeH3 = Int64(h3: dto.homeH3)
+                }
+            } else {
+                let player = Player(
+                    id: dto.id,
+                    displayName: dto.displayName.isEmpty ? "Player" : dto.displayName,
+                    homeH3: dto.homeH3,
+                    colorHex: dto.color.isEmpty ? "#888888" : dto.color,
+                    isLocal: false
+                )
+                context.insert(player)
+                players.append(player)
+            }
+        }
+        try? context.save()
+    }
+
+    /// adopt the authenticated display name for the local player
+    public func setLocalDisplayName(_ name: String) {
+        guard !name.isEmpty, localPlayer.displayName != name else { return }
+        localPlayer.displayName = name
+        try? context.save()
     }
 
     // MARK: home hex

@@ -42,8 +42,8 @@ func main() {
 }
 
 const (
-	devUserEmail    = "dev@driverev.app"
-	devUserPassword = "DOSbox074" // those who know
+	devUserEmail    = "dev@test.driverev.app"
+	devUserPassword = "driverev"
 )
 
 func seedDevUser(app core.App) error {

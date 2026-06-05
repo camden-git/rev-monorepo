@@ -80,6 +80,24 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         return response.items
     }
 
+    public func listUsers() async throws -> [PlayerDTO] {
+        let query = [URLQueryItem(name: "perPage", value: "500")]
+        let request = makeRequest(path: "/api/collections/users/records", method: "GET", authed: true, query: query)
+        let response = try await send(request, decoding: ListResponse<PlayerDTO>.self)
+        return response.items
+    }
+
+    public func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws {
+        var request = makeRequest(path: "/api/collections/users/records/\(userId)", method: "PATCH", authed: true)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            // home_h3 crosses the wire as a decimal string for exactness (matches the schema's TEXT field)
+            "home_h3": String(homeH3),
+            "color": color,
+            "display_name": displayName,
+        ])
+        _ = try await send(request, decoding: PlayerDTO.self)
+    }
+
     // MARK: request plumbing
 
     private func makeRequest(path: String, method: String, authed: Bool, query: [URLQueryItem] = []) -> URLRequest {
