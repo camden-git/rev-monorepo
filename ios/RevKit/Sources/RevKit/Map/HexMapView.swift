@@ -110,8 +110,11 @@ public struct HexMapView: UIViewRepresentable {
         weak var mapView: MKMapView?
 
         private var gridOverlay: MKMultiPolygon?
-        /// one overlay per player; the value's identity is matched in `rendererFor`.
-        private var playerOverlays: [String: MKMultiPolygon] = [:]
+
+        private var claimFillOverlays: [MKMultiPolygon] = []
+        private var claimFillStyles: [ObjectIdentifier: (color: UIColor, alpha: CGFloat)] = [:]
+        private var claimOutlineOverlays: [MKMultiPolygon] = []
+        private var claimOutlineColors: [ObjectIdentifier: UIColor] = [:]
         private var visibleClaimCells: Set<UInt64> = []
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
@@ -129,6 +132,37 @@ public struct HexMapView: UIViewRepresentable {
             self.store = store
             self.onVisibleCellsChange = onVisibleCellsChange
             self.onSelectTile = onSelectTile
+        }
+
+        // MARK: speed to fill intensity
+
+        /// fill alpha scales with a tile's score, which is just its speed in mph the scale's top is the
+        /// fastest tile anywhere in the store
+        private static let minFillAlpha: CGFloat = 0.12
+        private static let maxFillAlpha: CGFloat = 0.55
+        /// floor for the scale's top, so a garage full of slow tiles doesn't amplify GPS noise
+        /// into a full-contrast map
+        private static let minSpeedScaleMph = 15.0
+        /// quantizing the scale into bands means decay only rebuilds the overlay when a tile
+        /// actually crosses a band
+        private static let fillBandCount = 6
+
+        private func speedScaleCeil(now: Date) -> Double {
+            var ceil = Self.minSpeedScaleMph
+            for cell in store.tiles.keys {
+                if let s = store.effectiveScore(of: cell, now: now), s > ceil { ceil = s }
+            }
+            return ceil
+        }
+
+        private static func fillBand(forSpeed mph: Double, ceil: Double) -> Int {
+            let t = ceil <= 0 ? 0 : min(max(mph / ceil, 0), 1)
+            return Int((t * Double(fillBandCount - 1)).rounded())
+        }
+
+        private static func fillAlpha(forBand band: Int) -> CGFloat {
+            let t = CGFloat(band) / CGFloat(fillBandCount - 1)
+            return minFillAlpha + (maxFillAlpha - minFillAlpha) * t
         }
 
         // MARK: grid
@@ -152,15 +186,39 @@ public struct HexMapView: UIViewRepresentable {
             guard signature != claimedOverlaySignature else { return }
             claimedOverlaySignature = signature
 
-            // remove and rebuild the visible slice of each player's overlay
-            for overlay in playerOverlays.values { mapView.removeOverlay(overlay) }
-            playerOverlays.removeAll()
+            // remove and rebuild the visible slice of each player's overlay, split into one
+            // overlay per speed band so fill intensity can vary across a player's territory
+            for overlay in claimFillOverlays { mapView.removeOverlay(overlay) }
+            for overlay in claimOutlineOverlays { mapView.removeOverlay(overlay) }
+            claimFillOverlays.removeAll()
+            claimFillStyles.removeAll()
+            claimOutlineOverlays.removeAll()
+            claimOutlineColors.removeAll()
             let cellsByOwner = visibleClaimCellsByOwner()
+            let ceil = speedScaleCeil(now: .now)
             for player in store.players {
-                let cells = cellsByOwner[player.id] ?? []
-                guard let overlay = H3Grid.claimedOverlay(for: cells) else { continue }
-                playerOverlays[player.id] = overlay
-                mapView.addOverlay(overlay)
+                guard let cells = cellsByOwner[player.id], !cells.isEmpty,
+                      let color = UIColor(hex: player.colorHex) else { continue }
+
+                var cellsByBand: [Int: Set<UInt64>] = [:]
+                for cell in cells {
+                    let speed = store.effectiveScore(of: cell) ?? 0
+                    cellsByBand[Self.fillBand(forSpeed: speed, ceil: ceil), default: []].insert(cell)
+                }
+
+                // stroke-less band fills first
+                for (band, bandCells) in cellsByBand {
+                    guard let overlay = H3Grid.claimedOverlay(for: bandCells) else { continue }
+                    claimFillOverlays.append(overlay)
+                    claimFillStyles[ObjectIdentifier(overlay)] = (color, Self.fillAlpha(forBand: band))
+                    mapView.addOverlay(overlay)
+                }
+                // then a single merged outline on top for the territory's outer border
+                if let outline = H3Grid.claimedOverlay(for: cells) {
+                    claimOutlineOverlays.append(outline)
+                    claimOutlineColors[ObjectIdentifier(outline)] = color
+                    mapView.addOverlay(outline)
+                }
             }
 
             // the local player's home hex on top
@@ -177,9 +235,11 @@ public struct HexMapView: UIViewRepresentable {
         private func makeClaimedOverlaySignature() -> ClaimedOverlaySignature {
             var visibleOwners: [UInt64: String] = [:]
             visibleOwners.reserveCapacity(Swift.min(visibleClaimCells.count, store.tiles.count))
+            let ceil = speedScaleCeil(now: .now)
             for cell in visibleClaimCells {
                 if let ownerId = store.tiles[cell]?.ownerId {
-                    visibleOwners[cell] = ownerId
+                    let band = Self.fillBand(forSpeed: store.effectiveScore(of: cell) ?? 0, ceil: ceil)
+                    visibleOwners[cell] = "\(ownerId)#\(band)"
                 }
             }
 
@@ -312,9 +372,14 @@ public struct HexMapView: UIViewRepresentable {
                 return MKOverlayRenderer(overlay: overlay)
             }
             let renderer = MKMultiPolygonRenderer(multiPolygon: multiPolygon)
-            if let ownerId = playerOverlays.first(where: { $0.value === overlay })?.key,
-               let color = store.player(id: ownerId).flatMap({ UIColor(hex: $0.colorHex) }) {
-                renderer.fillColor = color.withAlphaComponent(0.4)
+            if let style = claimFillStyles[ObjectIdentifier(multiPolygon)] {
+                // band fill: no stroke, so adjacent bands blend without an internal seam
+                renderer.fillColor = style.color.withAlphaComponent(style.alpha)
+                renderer.strokeColor = .clear
+                renderer.lineWidth = 0
+            } else if let color = claimOutlineColors[ObjectIdentifier(multiPolygon)] {
+                // territory outer border only
+                renderer.fillColor = .clear
                 renderer.strokeColor = color
                 renderer.lineWidth = 1.5
             } else {
