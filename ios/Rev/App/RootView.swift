@@ -3,6 +3,7 @@ import SwiftData
 import SwiftUI
 
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var store: TerritoryStore
     @State private var tracker: DriveTracker
     /// sign in with Apple flow, shares its Keychain token with sync
@@ -51,6 +52,18 @@ struct RootView: View {
         }
         .task {
             await sync.restoreSessionIfPossible()
+            reconcileRealtime()
+        }
+        // keep the live tile stream open only while the app is active and signed in
+        .onChange(of: scenePhase) { _, _ in reconcileRealtime() }
+        .onChange(of: sync.isSignedIn) { _, _ in reconcileRealtime() }
+    }
+
+    private func reconcileRealtime() {
+        if scenePhase == .active && sync.isSignedIn {
+            sync.startRealtime()
+        } else {
+            sync.stopRealtime()
         }
     }
 
@@ -65,6 +78,10 @@ struct RootView: View {
             .overlay(alignment: .top) { toast }
             .safeAreaInset(edge: .top) { syncStatusBanner }
             .task {
+                // stream mid-drive captures to the server so other players see them live
+                tracker.onLiveClaims = { scores in
+                    Task { await sync.flushLiveClaims(scores) }
+                }
                 tracker.start()
             }
             .onAppear { showDrawer = true }

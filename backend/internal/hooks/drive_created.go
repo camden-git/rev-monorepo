@@ -93,6 +93,29 @@ func resolveDrive(app core.App, drive *core.Record) error {
 	})
 }
 
+// ResolveDirectClaims applies a batch of direct per-tile claims for one user in a
+// single transaction
+//
+// used by the live in-drive claim endpoint so captures broadcast over the `tiles`
+// realtime topic as they happen instead of only when the drive is uploaded
+func ResolveDirectClaims(app core.App, userID string, perTile map[string]float64, now time.Time) error {
+	if userID == "" {
+		return errors.New("claim batch has no user")
+	}
+	return app.RunInTransaction(func(txApp core.App) error {
+		for h3str, score := range perTile {
+			h3, err := strconv.ParseUint(h3str, 10, 64)
+			if err != nil {
+				continue // skip malformed keys rather than fail the whole batch
+			}
+			if _, err := resolveTile(txApp, h3, userID, score, now); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // resolveTile applies one direct claim and reports whether the tile changed
 func resolveTile(txApp core.App, h3 uint64, userID string, score float64, now time.Time) (bool, error) {
 	h3str := strconv.FormatUint(h3, 10)

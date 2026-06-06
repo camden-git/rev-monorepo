@@ -36,6 +36,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     var onCreateDrive: @Sendable (DriveUploadPayload) throws -> DriveRecordDTO = { _ in
         DriveRecordDTO(id: "rec", created: nil)
     }
+    var onClaimTiles: @Sendable ([UInt64: Double]) throws -> Void = { _ in }
     var onListTiles: @Sendable (Date?) throws -> [TileDTO] = { _ in [] }
     var onListTilesForCells: @Sendable (Set<UInt64>) throws -> [TileDTO] = { _ in [] }
     var onAuth: @Sendable (String, String?) throws -> AuthResponse = { _, _ in
@@ -51,6 +52,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     var onUpdateProfile: @Sendable (String, UInt64, String, String) throws -> Void = { _, _, _, _ in }
 
     private(set) var createdPayloads: [DriveUploadPayload] = []
+    private(set) var claimBatches: [[UInt64: Double]] = []
     private(set) var listSinceArgs: [Date?] = []
     private(set) var listCellArgs: [Set<UInt64>] = []
     private(set) var listUsersCallCount = 0
@@ -77,6 +79,11 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         return try onCreateDrive(payload)
     }
 
+    func claimTiles(perTileScores: [UInt64: Double]) async throws {
+        lock.withLock { claimBatches.append(perTileScores) }
+        try onClaimTiles(perTileScores)
+    }
+
     func listTiles(updatedSince: Date?) async throws -> [TileDTO] {
         lock.withLock { listSinceArgs.append(updatedSince) }
         return try onListTiles(updatedSince)
@@ -95,6 +102,50 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws {
         lock.withLock { profileUpdates.append((userId, homeH3, color, displayName)) }
         try onUpdateProfile(userId, homeH3, color, displayName)
+    }
+}
+
+// MARK: realtime mock
+
+/// stubbable `TileRealtimeClient` that lets tests drive server pushes by hand
+final class MockTileRealtimeClient: TileRealtimeClient, @unchecked Sendable {
+    private let lock = NSLock()
+    private var onConnect: (@MainActor @Sendable () -> Void)?
+    private var onTile: (@MainActor @Sendable (TileDTO) -> Void)?
+    private(set) var startCount = 0
+    private(set) var stopCount = 0
+
+    var isRunning: Bool { lock.withLock { onConnect != nil } }
+
+    func start(
+        onConnect: @escaping @MainActor @Sendable () -> Void,
+        onTile: @escaping @MainActor @Sendable (TileDTO) -> Void
+    ) {
+        lock.withLock {
+            startCount += 1
+            self.onConnect = onConnect
+            self.onTile = onTile
+        }
+    }
+
+    func stop() {
+        lock.withLock {
+            stopCount += 1
+            onConnect = nil
+            onTile = nil
+        }
+    }
+
+    /// simulate a server-pushed tile reaching the client
+    @MainActor func emit(_ dto: TileDTO) {
+        let handler = lock.withLock { onTile }
+        handler?(dto)
+    }
+
+    /// simulate a (re)connect handshake completing
+    @MainActor func simulateConnect() {
+        let handler = lock.withLock { onConnect }
+        handler?()
     }
 }
 

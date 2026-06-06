@@ -70,6 +70,12 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         return try await send(request, decoding: DriveRecordDTO.self)
     }
 
+    public func claimTiles(perTileScores: [UInt64: Double]) async throws {
+        var request = try makeRequest(path: "/api/rev/tiles/claim", method: "POST", authed: true)
+        request.httpBody = try encoder.encode(TileClaimRequest(perTileScores: perTileScores))
+        _ = try await send(request, decoding: TileClaimResponse.self)
+    }
+
     public func listTiles(updatedSince: Date?) async throws -> [TileDTO] {
         var queryItems = [URLQueryItem(name: "perPage", value: "500")]
         if let updatedSince {

@@ -77,6 +77,24 @@ public struct TileDTO: Decodable, Sendable, Equatable {
     }
 }
 
+/// POST body for the live in-drive claim endpoint `POST /api/rev/tiles/claim`
+public struct TileClaimRequest: Encodable, Sendable {
+    public let perTileScores: PerTileScores
+
+    public init(perTileScores: [UInt64: Double]) {
+        self.perTileScores = PerTileScores(perTileScores)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case perTileScores = "per_tile_scores"
+    }
+}
+
+/// `{ "ok": true }` ack from the claim endpoint
+public struct TileClaimResponse: Decodable, Sendable {
+    public let ok: Bool
+}
+
 /// POST body for the compact map-window tile endpoint
 public struct TileWindowRequest: Encodable, Sendable {
     public let parentResolution: Int

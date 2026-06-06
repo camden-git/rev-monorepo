@@ -22,6 +22,9 @@ public final class SyncService {
     private let client: PocketBaseClient
     private let tokenStore: TokenStore
     private let cursor: SyncCursor
+    /// live tile push, nil in tests that don't exercise realtime
+    private let realtime: TileRealtimeClient?
+    private var realtimeActive = false
 
     /// authenticated PocketBase user id, or nil when signed out
     public private(set) var currentUserId: String?
@@ -49,7 +52,8 @@ public final class SyncService {
             context: context,
             client: URLSessionPocketBaseClient(config: config, tokenStore: tokenStore),
             tokenStore: tokenStore,
-            cursor: cursor
+            cursor: cursor,
+            realtime: PocketBaseRealtimeClient(config: config, tokenStore: tokenStore)
         )
     }
 
@@ -59,13 +63,15 @@ public final class SyncService {
         context: ModelContext,
         client: PocketBaseClient,
         tokenStore: TokenStore = InMemoryTokenStore(),
-        cursor: SyncCursor = InMemorySyncCursor()
+        cursor: SyncCursor = InMemorySyncCursor(),
+        realtime: TileRealtimeClient? = nil
     ) {
         self.store = store
         self.context = context
         self.tokenStore = tokenStore
         self.cursor = cursor
         self.client = client
+        self.realtime = realtime
     }
 
     public var isSignedIn: Bool { currentUserId != nil }
@@ -184,6 +190,42 @@ public final class SyncService {
         }
     }
 
+    /// push the tiles claimed so far in the active drive so the server resolves and
+    /// broadcasts them live to other players
+    public func flushLiveClaims(_ perTileScores: [UInt64: Double]) async {
+        guard currentUserId != nil, !perTileScores.isEmpty else { return }
+        do {
+            try await client.claimTiles(perTileScores: perTileScores)
+        } catch {
+            recordSyncFailure(error, operation: "flushLiveClaims", visible: false)
+        }
+    }
+
+    // MARK: realtime
+
+    /// open the live tile stream so captures from other players land within ~1s
+    /// instead of waiting for the next poll
+    public func startRealtime() {
+        guard currentUserId != nil, let realtime, !realtimeActive else { return }
+        realtimeActive = true
+        realtime.start(
+            onConnect: { [weak self] in
+                // backfill anything missed while disconnected via the delta-poll
+                Task { @MainActor in await self?.pollTiles() }
+            },
+            onTile: { [weak self] dto in
+                self?.store.applyRemoteTiles([dto])
+            }
+        )
+    }
+
+    /// tear down the live tile stream
+    public func stopRealtime() {
+        guard realtimeActive else { return }
+        realtimeActive = false
+        realtime?.stop()
+    }
+
     /// pull the player roster into the local `Player` table
     public func syncRoster() async {
         guard currentUserId != nil else { return }
@@ -260,6 +302,7 @@ public final class SyncService {
     }
 
     private func clearSession() {
+        stopRealtime()
         tokenStore.clear()
         currentUserId = nil
     }
