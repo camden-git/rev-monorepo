@@ -36,7 +36,7 @@ public final class InMemoryTokenStore: TokenStore, @unchecked Sendable {
 }
 
 #if canImport(Security)
-/// Keychain-backed token store (REF: docs/tech-stack.md §Auth — "Client stores
+/// Keychain-backed token store (REF: docs/tech-stack.md §Auth - "Client stores
 /// the auth token in the Keychain"). Generic-password item keyed by service +
 /// account.
 public final class KeychainTokenStore: TokenStore, @unchecked Sendable {

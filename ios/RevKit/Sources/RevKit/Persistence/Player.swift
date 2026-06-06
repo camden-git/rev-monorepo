@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// a local player (mirrors the server `users` collection — REF: docs/tech-stack.md
+/// a local player (mirrors the server `users` collection - REF: docs/tech-stack.md
 /// §Local Storage Model). Local-only this round: one `isLocal` player plus seeded opponents
 /// so score comparison actually has someone to compare against.
 @Model

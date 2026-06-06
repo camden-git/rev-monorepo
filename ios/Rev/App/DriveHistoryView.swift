@@ -7,12 +7,30 @@ import SwiftUI
 /// local tallies (docs/tech-stack.md §Sync Model)
 struct DriveHistoryView: View {
     let store: TerritoryStore
+    /// when pushed inside the profile hub, drop the wrapping stack + Done button
+    /// and let the parent provide the navigation bar and back button
+    var embedded = false
     var onDone: () -> Void = {}
 
     /// the drive whose full recap is being shown
     @State private var selectedDrive: DriveRecord?
 
     var body: some View {
+        if embedded {
+            content
+        } else {
+            NavigationStack {
+                content
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done", action: onDone)
+                        }
+                    }
+            }
+        }
+    }
+
+    private var content: some View {
         let drives = store.driveHistory()
         let stats = EmpireStats.compute(
             tiles: Array(store.tiles.values),
@@ -20,8 +38,7 @@ struct DriveHistoryView: View {
             driveSummaries: drives.compactMap(\.summary)
         )
 
-        NavigationStack {
-            List {
+        return List {
                 Section {
                     HStack(spacing: 12) {
                         statCell("\(stats.tilesHeld)", "Tiles held", .blue)
@@ -64,19 +81,13 @@ struct DriveHistoryView: View {
                     }
                 }
             }
-            .navigationTitle("Your Empire")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
-                }
-            }
-            .sheet(item: $selectedDrive) { record in
-                if let summary = record.summary {
-                    DriveSummaryView(summary: summary, store: store) { selectedDrive = nil }
-                        .presentationDetents([.medium, .large])
-                        .presentationDragIndicator(.visible)
-                }
+        .navigationTitle("Your Empire")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $selectedDrive) { record in
+            if let summary = record.summary {
+                DriveSummaryView(summary: summary, store: store) { selectedDrive = nil }
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
         }
     }

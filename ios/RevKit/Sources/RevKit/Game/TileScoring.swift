@@ -25,7 +25,7 @@ public enum TileScoring {
     static let maxSubSteps = 64
 
     /// minimum distance (m) actually travelled inside a tile before it earns a score. a tile you
-    /// merely clip the edge of has too little in-tile travel to trust — its score would be a single
+    /// merely clip the edge of has too little in-tile travel to trust - its score would be a single
     /// noisy GPS segment with nothing to average against, which read far too high. below this floor
     /// the tile simply isn't scored (it may still be weakly claimed live at score 0).
     static let minTileDistanceMeters = 12.0

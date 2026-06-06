@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A612DB066C3D529986584A8B /* RevApp.swift */; };
+		2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F692E402518C09F1A7976B /* ProfileHubView.swift */; };
 		39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */; };
 		50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C0F969107087F96013E67F /* LeaderboardView.swift */; };
 		750F9185B65529585FBA4B91 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5581F52012A4971B7DF1565F /* AppleSignInButton.swift */; };
@@ -18,6 +19,9 @@
 		9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */; };
 		A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FDC10F6072E934167CD1D7 /* ColorHex.swift */; };
 		BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9B7B4275284769A91EF50C5 /* RevKit */; };
+		BD993042EE13D451121A04CD /* PlayerAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */; };
+		CD9D182404C3D85F06D3425A /* ViewStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0673B770485F7009C4E40F /* ViewStyles.swift */; };
+		FE6E01FCDAFF5997C0C16BE8 /* HomeDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,14 +31,18 @@
 		15713F2A44FA62B340F54D44 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		26711864EBD6BFBDD37E9669 /* Rev.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rev.entitlements; sourceTree = "<group>"; };
 		2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSummaryView.swift; sourceTree = "<group>"; };
+		30F692E402518C09F1A7976B /* ProfileHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileHubView.swift; sourceTree = "<group>"; };
 		32B76981DF5A715E1D4AC6D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		40C0F969107087F96013E67F /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
 		5581F52012A4971B7DF1565F /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
-		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RevKit; path = RevKit; sourceTree = SOURCE_ROOT; };
+		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
+		AC0673B770485F7009C4E40F /* ViewStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewStyles.swift; sourceTree = "<group>"; };
+		D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDrawer.swift; sourceTree = "<group>"; };
 		F23E45A1D168FC97A7B75918 /* TileDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDetailView.swift; sourceTree = "<group>"; };
+		FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerAvatar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,12 +90,16 @@
 				14FDC10F6072E934167CD1D7 /* ColorHex.swift */,
 				10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */,
 				2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */,
+				D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */,
 				40C0F969107087F96013E67F /* LeaderboardView.swift */,
 				15713F2A44FA62B340F54D44 /* OnboardingView.swift */,
+				FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */,
+				30F692E402518C09F1A7976B /* ProfileHubView.swift */,
 				136227412603B5999AB44748 /* ProfileSettingsView.swift */,
 				A612DB066C3D529986584A8B /* RevApp.swift */,
 				32B76981DF5A715E1D4AC6D1 /* RootView.swift */,
 				F23E45A1D168FC97A7B75918 /* TileDetailView.swift */,
+				AC0673B770485F7009C4E40F /* ViewStyles.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -131,6 +143,11 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					6DB0851F2343469158CF0ECF = {
+						DevelopmentTeam = "";
+					};
+				};
 			};
 			buildConfigurationList = E5AAED5AF29484A42097BAAF /* Build configuration list for PBXProject "Rev" */;
 			developmentRegion = en;
@@ -163,12 +180,16 @@
 				A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */,
 				39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */,
 				9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */,
+				FE6E01FCDAFF5997C0C16BE8 /* HomeDrawer.swift in Sources */,
 				50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */,
 				93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */,
+				BD993042EE13D451121A04CD /* PlayerAvatar.swift in Sources */,
+				2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */,
 				76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */,
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,
 				9422689350B941F2325CCDA5 /* RootView.swift in Sources */,
 				8C8F06F9CBBAC65E17612939 /* TileDetailView.swift in Sources */,
+				CD9D182404C3D85F06D3425A /* ViewStyles.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,7 +327,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 543LGZY2RD;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
@@ -332,7 +352,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 543LGZY2RD;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;

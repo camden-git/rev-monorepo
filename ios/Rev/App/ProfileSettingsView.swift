@@ -6,16 +6,27 @@ import UIKit
 struct ProfileSettingsView: View {
     let store: TerritoryStore
     let sync: SyncService
+    /// when pushed inside the profile hub, drop the wrapping stack + Cancel button
+    /// (the hub's navigation bar back button serves as cancel)
+    var embedded = false
     var onDone: () -> Void = {}
+
+    @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
     @State private var colorHex: String
     @State private var isSaving = false
     @State private var saveError: String?
 
-    init(store: TerritoryStore, sync: SyncService, onDone: @escaping () -> Void = {}) {
+    init(
+        store: TerritoryStore,
+        sync: SyncService,
+        embedded: Bool = false,
+        onDone: @escaping () -> Void = {}
+    ) {
         self.store = store
         self.sync = sync
+        self.embedded = embedded
         self.onDone = onDone
         _name = State(initialValue: store.localPlayer.displayName)
         _colorHex = State(initialValue: store.localPlayer.colorHex)
@@ -28,58 +39,73 @@ struct ProfileSettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section { preview }
-
-                Section("Display Name") {
-                    ResponsiveTextField(
-                        "Name",
-                        text: $name,
-                        textContentType: .name,
-                        autocapitalizationType: .words,
-                        autocorrectionType: .no
-                    )
+        if embedded {
+            form
+                .navigationTitle("Edit Profile")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) { saveButton }
                 }
-
-                Section("Map Color") {
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(MapColorPalette.swatches, id: \.self) { hex in
-                            swatch(hex)
+        } else {
+            NavigationStack {
+                form
+                    .navigationTitle("Profile")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel", action: onDone)
+                                .disabled(isSaving)
                         }
+                        ToolbarItem(placement: .confirmationAction) { saveButton }
                     }
-                    .padding(.vertical, 8)
-                }
-
-                if let saveError {
-                    Section {
-                        Text(saveError)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
             }
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onDone)
-                        .disabled(isSaving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task { await save() }
-                    } label: {
-                        if isSaving {
-                            ProgressView()
-                        } else {
-                            Text("Save")
-                        }
+        }
+    }
+
+    private var form: some View {
+        Form {
+            Section { preview }
+
+            Section("Display Name") {
+                ResponsiveTextField(
+                    "Name",
+                    text: $name,
+                    textContentType: .name,
+                    autocapitalizationType: .words,
+                    autocorrectionType: .no
+                )
+            }
+
+            Section("Map Color") {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(MapColorPalette.swatches, id: \.self) { hex in
+                        swatch(hex)
                     }
-                    .disabled(trimmedName.isEmpty || isSaving)
+                }
+                .padding(.vertical, 8)
+            }
+
+            if let saveError {
+                Section {
+                    Text(saveError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             }
         }
+    }
+
+    private var saveButton: some View {
+        Button {
+            Task { await save() }
+        } label: {
+            if isSaving {
+                ProgressView()
+            } else {
+                Text("Save")
+            }
+        }
+        .disabled(trimmedName.isEmpty || isSaving)
     }
 
     private var preview: some View {
@@ -125,7 +151,7 @@ struct ProfileSettingsView: View {
         saveError = nil
         store.updateLocalProfile(displayName: trimmedName, colorHex: colorHex)
         guard sync.isSignedIn else {
-            onDone()
+            finish()
             return
         }
 
@@ -134,9 +160,18 @@ struct ProfileSettingsView: View {
         isSaving = false
 
         if didSave {
-            onDone()
+            finish()
         } else {
             saveError = sync.lastError ?? "Couldn't sync your profile. Try again."
+        }
+    }
+
+    /// pop when pushed in the hub, otherwise hand back to the presenting sheet
+    private func finish() {
+        if embedded {
+            dismiss()
+        } else {
+            onDone()
         }
     }
 }

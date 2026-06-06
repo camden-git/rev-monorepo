@@ -7,26 +7,36 @@ import SwiftUI
 /// territory size
 struct LeaderboardView: View {
     let store: TerritoryStore
+    /// when pushed inside a hub/drawer, drop the wrapping stack + Done button
+    var embedded = false
     var onDone: () -> Void = {}
 
     private var entries: [TerritoryStore.LeaderboardEntry] { store.leaderboard() }
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    row(rank: index + 1, entry: entry)
-                        .listRowBackground(entry.isLocal ? Color.blue.opacity(0.12) : nil)
-                }
-            }
-            .navigationTitle("Leaderboard")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
-                }
+        if embedded {
+            list
+        } else {
+            NavigationStack {
+                list
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done", action: onDone)
+                        }
+                    }
             }
         }
+    }
+
+    private var list: some View {
+        List {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                row(rank: index + 1, entry: entry)
+                    .listRowBackground(entry.isLocal ? Color.blue.opacity(0.12) : nil)
+            }
+        }
+        .navigationTitle("Leaderboard")
+        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func row(rank: Int, entry: TerritoryStore.LeaderboardEntry) -> some View {
