@@ -289,7 +289,7 @@ public final class DriveTracker {
         // persist the finished drive + its provisional summary (uploaded = false), the future
         // backend upload reads from here and returns the authoritative result
         store.record(drive, summary: summary)
-        currentDrive = drive
+        currentDrive = nil
         isRecording = false
         currentSpeedMph = 0
         contestedOwnerName = nil
