@@ -111,7 +111,7 @@ struct TileDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 18)
         .padding(.horizontal, 20)
-        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     /// decay has pulled the effective score meaningfully below the claim score

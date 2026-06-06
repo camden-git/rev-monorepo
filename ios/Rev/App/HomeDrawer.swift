@@ -115,7 +115,7 @@ struct HomeDrawer: View {
             .lineLimit(1)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .glassCapsule()
+            .background(.regularMaterial, in: Capsule())
         }
     }
 
@@ -337,7 +337,7 @@ struct HomeDrawer: View {
 private struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content.background(
-            Color(uiColor: .secondarySystemBackground),
+            .regularMaterial,
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
     }
