@@ -51,8 +51,8 @@ public final class SyncService {
     public var isSignedIn: Bool { currentUserId != nil }
 
     /// adopt a session from an external auth flow (e.g. Sign in with Apple)
-    /// reconciles the local player's seeded id onto the authenticated PocketBase
-    /// user id so offline-claimed tiles dedupe with the server's view of "me".
+    /// reconciles the local player's local id onto the authenticated PocketBase
+    /// user id so offline-claimed tiles dedupe with the server's view of "me"
     public func adoptSession(_ response: AuthResponse) {
         tokenStore.save(response.token)
         currentUserId = response.record.id

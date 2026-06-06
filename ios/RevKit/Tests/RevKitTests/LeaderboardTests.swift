@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import RevKit
 
-/// one shared in-memory container the seeder runs once,
+/// one shared in-memory container bootstraps the local player once,
 /// so this single test asserts the zero-tile case first, then
 /// the post-claim ordering
 @MainActor
@@ -19,11 +19,11 @@ struct LeaderboardTests {
     @Test func rankByTilesHeld() {
         let store = TerritoryStore(context: Self.container.mainContext)
 
-        // seeded opponents (Ada, Owen) hold tiles and the local player starts with none
+        // first launch starts with only the local player, and no claimed tiles
         let before = store.leaderboard()
         #expect(before.first { $0.isLocal }?.tilesHeld == 0)
-        #expect(before.contains { $0.displayName == "Ada" })
-        #expect(before.contains { $0.displayName == "Owen" })
+        #expect(before.filter(\.isLocal).count == 1)
+        #expect(before.allSatisfy { $0.tilesHeld == 0 })
 
         // give the local player the most territory so it sorts to the top
         let me = store.localPlayer.id

@@ -14,7 +14,7 @@ import SwiftData
 public final class TerritoryStore {
     private let context: ModelContext
 
-    /// all players (local + seeded opponents)
+    /// all known players (local + roster-synced opponents)
     public private(set) var players: [Player] = []
     public private(set) var localPlayer: Player
 
@@ -28,7 +28,8 @@ public final class TerritoryStore {
 
     public init(context: ModelContext) {
         self.context = context
-        Seeder.seedIfEmpty(context)
+        Seeder.removeLegacyFakeOpponents(context)
+        Seeder.ensureLocalPlayer(context)
 
         let loadedPlayers = (try? context.fetch(FetchDescriptor<Player>())) ?? []
         let local = loadedPlayers.first(where: { $0.isLocal })
@@ -105,7 +106,7 @@ public final class TerritoryStore {
         }
     }
 
-    /// collapse the locally-generated player id (a `UUID` seeded before sign-in)
+    /// collapse the locally-generated player id (a `UUID` created before sign-in)
     /// onto the authenticated PocketBase user id, re-pointing every tile the local
     /// player already owns
     ///

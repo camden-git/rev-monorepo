@@ -92,7 +92,7 @@ struct TileSyncEngineTests {
         let store = makeStore()
         let oldId = store.localPlayer.id
         let cell = SyncFixtures.cell &+ 7001
-        store.claim(cell, score: 30) // owned by the local player under its seeded id
+        store.claim(cell, score: 30) // owned by the local player under its pre-sign-in id
         #expect(store.tiles[cell]?.ownerId == oldId)
 
         let serverId = "srv-\(UUID().uuidString)"
