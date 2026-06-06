@@ -23,6 +23,7 @@ func main() {
 
 	hooks.RegisterDriveHooks(app)
 	routes.RegisterInviteAuthRoutes(app)
+	routes.RegisterTileRoutes(app)
 
 	// local dev stuff
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {

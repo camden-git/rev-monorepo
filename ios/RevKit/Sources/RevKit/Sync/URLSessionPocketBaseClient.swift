@@ -79,19 +79,15 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
     public func listTiles(h3Cells: Set<UInt64>) async throws -> [TileDTO] {
         guard !h3Cells.isEmpty else { return [] }
 
-        var tiles: [TileDTO] = []
-        for chunk in Array(h3Cells).chunked(into: 80) {
-            let filter = chunk
-                .map { "h3 = \"\($0)\"" }
-                .joined(separator: " || ")
-            let queryItems = [
-                URLQueryItem(name: "perPage", value: "500"),
-                URLQueryItem(name: "filter", value: filter),
-                URLQueryItem(name: "sort", value: "updated"),
-            ]
-            tiles.append(contentsOf: try await listAllTilePages(queryItems: queryItems))
-        }
-        return tiles
+        let parentIds = H3Grid.tileWindowParentIds(for: h3Cells).sorted()
+        guard !parentIds.isEmpty else { return [] }
+
+        var request = makeRequest(path: "/api/rev/tiles/window", method: "POST", authed: true)
+        request.httpBody = try encoder.encode(TileWindowRequest(
+            parentResolution: Int(H3Grid.tileWindowParentResolution.rawValue),
+            parents: parentIds
+        ))
+        return try await send(request, decoding: TileWindowResponse.self).items
     }
 
     public func listUsers() async throws -> [PlayerDTO] {
@@ -155,14 +151,5 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
             page += 1
         }
         return all
-    }
-}
-
-private extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        guard size > 0 else { return [self] }
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
     }
 }

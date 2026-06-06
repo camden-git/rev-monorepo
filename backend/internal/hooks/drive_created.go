@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/camden-git/rev-monorepo/backend/internal/game"
+	"github.com/camden-git/rev-monorepo/backend/internal/h3util"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -104,6 +105,7 @@ func resolveTile(txApp core.App, h3 uint64, userID string, score float64, now ti
 		return true, nil
 
 	case game.Reinforced:
+		setTileWindowParent(existing, h3)
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
@@ -112,6 +114,7 @@ func resolveTile(txApp core.App, h3 uint64, userID string, score float64, now ti
 		return true, nil
 
 	case game.Captured:
+		setTileWindowParent(existing, h3)
 		existing.Set("owner", userID)
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("last_driven_at", now)
@@ -201,11 +204,20 @@ func createTile(txApp core.App, h3str, userID string, score float64, isHome bool
 	}
 	rec := core.NewRecord(col)
 	rec.Set("h3", h3str)
+	if h3, err := strconv.ParseUint(h3str, 10, 64); err == nil {
+		setTileWindowParent(rec, h3)
+	}
 	rec.Set("owner", userID)
 	rec.Set("claim_score", score)
 	rec.Set("last_driven_at", now)
 	rec.Set("is_home", isHome)
 	return txApp.Save(rec)
+}
+
+func setTileWindowParent(rec *core.Record, h3 uint64) {
+	if parent, ok := h3util.Parent(h3, h3util.TileWindowParentResolution); ok {
+		rec.Set("h3_r8", strconv.FormatUint(parent, 10))
+	}
 }
 
 func appendHistory(txApp core.App, h3str, userID string, score float64, now time.Time) error {

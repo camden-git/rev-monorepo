@@ -76,28 +76,32 @@ struct PocketBaseClientTests {
         #expect(!url.contains("filter"))
     }
 
-    @Test func listTilesByCellsBuildsH3FilterAndPaginates() async throws {
+    @Test func listTilesByCellsPostsCompactParentWindow() async throws {
         let cell = SyncFixtures.cell
         let listJSON = """
-        {"page":1,"perPage":500,"totalItems":1,"totalPages":2,"items":[
+        {"items":[
           {"id":"t1","h3":"\(cell)","owner":"u2","claim_score":40.5,"last_driven_at":"2026-06-01 09:00:00.000Z","is_home":false,"updated":"2026-06-02 09:00:00.000Z"}
         ]}
         """
-        let emptyPage = #"{"page":2,"perPage":500,"totalItems":1,"totalPages":2,"items":[]}"#
-        let transport = MockHTTPTransport { request in
-            let pageTwo = request.url?.absoluteString.contains("page=2") == true
-            return (Data((pageTwo ? emptyPage : listJSON).utf8), httpResponse(200))
-        }
+        let transport = MockHTTPTransport { _ in (Data(listJSON.utf8), httpResponse(200)) }
         let client = makeClient(transport)
 
         let tiles = try await client.listTiles(h3Cells: [cell, cell &+ 1])
 
         #expect(tiles.map(\.h3) == [cell])
-        #expect(transport.requests.count == 2)
-        let url = try #require(transport.requests.first?.url?.absoluteString)
-        #expect(url.contains("filter"))
-        #expect(url.contains("h3"))
-        #expect(url.contains("%7C%7C") || url.contains("||"))
+        #expect(transport.requests.count == 1)
+        let req = try #require(transport.requests.first)
+        #expect(req.httpMethod == "POST")
+        #expect(req.url?.path == "/api/rev/tiles/window")
+        #expect(req.url?.query == nil)
+        #expect(req.value(forHTTPHeaderField: "Authorization") == "tok")
+
+        let json = try JSONSerialization.jsonObject(with: try #require(req.httpBody)) as? [String: Any]
+        #expect(json?["parent_resolution"] as? Int == 8)
+        let parents = try #require(json?["parents"] as? [String])
+        #expect(!parents.isEmpty)
+        #expect(parents.count < 3)
+        #expect(parents.allSatisfy { UInt64($0) != nil })
     }
 
     @Test func authWithApplePostsProviderAndCode() async throws {

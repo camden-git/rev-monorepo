@@ -41,6 +41,8 @@ func up(app core.App) error {
 	tiles.Fields.Add(
 		// h3 as TEXT (exact uint64), see note above about issue with float64
 		&core.TextField{Name: "h3", Required: true, Max: 20},
+		// res-8 parent used for compact viewport queries
+		&core.TextField{Name: "h3_r8", Max: 20},
 		&core.RelationField{Name: "owner", CollectionId: users.Id, MaxSelect: 1, CascadeDelete: false},
 		&core.NumberField{Name: "claim_score"}, // distance-weighted avg speed (mph)
 		&core.DateField{Name: "last_driven_at"},
@@ -50,6 +52,7 @@ func up(app core.App) error {
 	)
 	tiles.Indexes = append(tiles.Indexes,
 		"CREATE UNIQUE INDEX idx_tiles_h3 ON tiles (h3)",
+		"CREATE INDEX idx_tiles_h3_r8 ON tiles (h3_r8)",
 		"CREATE INDEX idx_tiles_owner ON tiles (owner)",
 		"CREATE INDEX idx_tiles_last_driven_at ON tiles (last_driven_at)",
 		// the foreground delta-poll filters on this

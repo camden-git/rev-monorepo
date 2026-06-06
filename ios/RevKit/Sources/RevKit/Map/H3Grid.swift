@@ -12,6 +12,7 @@ public enum H3Grid {
     /// below this many cells the grid is drawn
     static let maxGridCells = 1800
     static let maxVisibleTileCells = 5000
+    static let tileWindowParentResolution: H3Cell.Resolution = .res8
 
     /// the res-10 cell containing a coordinate, nil if conversion fails
     static func cell(for coordinate: CLLocationCoordinate2D) -> H3Cell? {
@@ -48,6 +49,12 @@ public enum H3Grid {
 
     static func visibleCellIds(for region: MKCoordinateRegion, paddingRings: Int32 = 2) -> Set<UInt64> {
         Set(coveringCells(for: region, paddingRings: paddingRings, maxCells: maxVisibleTileCells).map(\.id))
+    }
+
+    static func tileWindowParentIds(for cellIds: Set<UInt64>) -> Set<UInt64> {
+        Set(cellIds.compactMap { id in
+            try? H3Cell(id).parent(at: tileWindowParentResolution).id
+        })
     }
 
     static func visibleClaimedCellIds<C: Sequence>(

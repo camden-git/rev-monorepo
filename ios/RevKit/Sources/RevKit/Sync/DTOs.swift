@@ -80,6 +80,27 @@ public struct TileDTO: Decodable, Sendable, Equatable {
     }
 }
 
+/// POST body for the compact map-window tile endpoint
+public struct TileWindowRequest: Encodable, Sendable {
+    public let parentResolution: Int
+    public let parents: [String]
+
+    public init(parentResolution: Int, parents: [UInt64]) {
+        self.parentResolution = parentResolution
+        self.parents = parents.map(String.init)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case parentResolution = "parent_resolution"
+        case parents
+    }
+}
+
+/// response from `POST /api/rev/tiles/window`
+public struct TileWindowResponse: Decodable, Sendable {
+    public let items: [TileDTO]
+}
+
 /// a `users` record as returned by the roster list endpoint
 public struct PlayerDTO: Decodable, Sendable, Equatable {
     public let id: String

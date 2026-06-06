@@ -331,7 +331,10 @@ public struct HexMapView: UIViewRepresentable {
             let syncCells = H3Grid.visibleCellIds(for: mapView.region)
             if syncCells != visibleSyncCells {
                 visibleSyncCells = syncCells
-                onVisibleCellsChange(syncCells)
+                let cells = syncCells
+                Task { @MainActor [onVisibleCellsChange] in
+                    onVisibleCellsChange(cells)
+                }
             }
 
             let claimCells = syncCells.isEmpty

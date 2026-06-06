@@ -25,7 +25,7 @@ public protocol PocketBaseClient: Sendable {
     /// `GET /api/collections/tiles/records?filter=(updated>="…")`
     func listTiles(updatedSince: Date?) async throws -> [TileDTO]
 
-    /// fetch specific H3 tiles, normally the visible map cells plus padding
+    /// fetch claimed tiles inside the visible map cells' coarser H3 parent chunks
     func listTiles(h3Cells: Set<UInt64>) async throws -> [TileDTO]
 
     /// fetch the player roster (every user's public profile)

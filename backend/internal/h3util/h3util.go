@@ -5,6 +5,10 @@ import h3 "github.com/uber/h3-go/v4"
 // Resolution is the res-10 grid Rev plays on (REF: docs/game-design.md §The Grid)
 const Resolution = 10
 
+// TileWindowParentResolution is the coarser parent cell used for map-window lookups
+// one res-8 parent contains roughly 49 res-10 play cells
+const TileWindowParentResolution = 8
+
 func toCell(id uint64) h3.Cell { return h3.Cell(id) }
 func toID(c h3.Cell) uint64    { return uint64(c) }
 
@@ -43,6 +47,15 @@ func GridDisk(origin uint64, k int) (cells []uint64, ok bool) {
 		return nil, false
 	}
 	return toIDs(disk), true
+}
+
+// Parent returns the ancestor cell at the requested resolution
+func Parent(id uint64, resolution int) (parent uint64, ok bool) {
+	p, err := toCell(id).Parent(resolution)
+	if err != nil {
+		return 0, false
+	}
+	return toID(p), true
 }
 
 // GridRing returns the cells exactly k grid steps from origin
