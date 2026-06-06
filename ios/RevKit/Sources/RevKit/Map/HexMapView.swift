@@ -98,6 +98,7 @@ public struct HexMapView: UIViewRepresentable {
     }
 
     public func updateUIView(_ mapView: MKMapView, context: Context) {
+        context.coordinator.updateVisibleCells(for: mapView)
         context.coordinator.syncClaimedOverlay()
         context.coordinator.syncBreadcrumb(breadcrumb)
     }
@@ -115,6 +116,7 @@ public struct HexMapView: UIViewRepresentable {
         private var claimFillStyles: [ObjectIdentifier: (color: UIColor, alpha: CGFloat)] = [:]
         private var claimOutlineOverlays: [MKMultiPolygon] = []
         private var claimOutlineColors: [ObjectIdentifier: UIColor] = [:]
+        private var visibleSyncCells: Set<UInt64> = []
         private var visibleClaimCells: Set<UInt64> = []
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
@@ -171,7 +173,7 @@ public struct HexMapView: UIViewRepresentable {
         func rebuildGrid() {
             guard let mapView else { return }
             let cells = H3Grid.coveringCells(for: mapView.region)
-            updateVisibleCells(for: mapView.region)
+            updateVisibleCells(for: mapView)
             if let gridOverlay { mapView.removeOverlay(gridOverlay) }
             let overlay = H3Grid.gridOverlay(for: cells)
             gridOverlay = overlay
@@ -182,7 +184,7 @@ public struct HexMapView: UIViewRepresentable {
         @MainActor
         func syncClaimedOverlay() {
             guard let mapView else { return }
-            let signature = makeClaimedOverlaySignature()
+            let signature = makeClaimedOverlaySignature(for: mapView)
             guard signature != claimedOverlaySignature else { return }
             claimedOverlaySignature = signature
 
@@ -232,7 +234,7 @@ public struct HexMapView: UIViewRepresentable {
             }
         }
 
-        private func makeClaimedOverlaySignature() -> ClaimedOverlaySignature {
+        private func makeClaimedOverlaySignature(for mapView: MKMapView) -> ClaimedOverlaySignature {
             var visibleOwners: [UInt64: String] = [:]
             visibleOwners.reserveCapacity(Swift.min(visibleClaimCells.count, store.tiles.count))
             let ceil = speedScaleCeil(now: .now)
@@ -251,8 +253,51 @@ public struct HexMapView: UIViewRepresentable {
             return ClaimedOverlaySignature(
                 visibleOwners: visibleOwners,
                 playerColors: playerColors,
-                localHomeCell: store.localPlayer.homeCell
+                localHomeCell: store.localPlayer.homeCell,
+                strokeWidthBand: strokeWidthBand(for: mapView)
             )
+        }
+
+        private func strokeWidthBand(for mapView: MKMapView) -> Int {
+            Int((territoryOutlineWidth(for: mapView) * 20).rounded())
+        }
+
+        private func territoryOutlineWidth(for mapView: MKMapView) -> CGFloat {
+            Self.scaledStrokeWidth(
+                hexEdgeScreenPoints: hexEdgeScreenPoints(in: mapView),
+                min: 0.35,
+                max: 1.5,
+                fraction: 0.08
+            )
+        }
+
+        private func homeOutlineWidth(for mapView: MKMapView) -> CGFloat {
+            Self.scaledStrokeWidth(
+                hexEdgeScreenPoints: hexEdgeScreenPoints(in: mapView),
+                min: 0.45,
+                max: 3,
+                fraction: 0.16
+            )
+        }
+
+        private func hexEdgeScreenPoints(in mapView: MKMapView) -> CGFloat {
+            let visibleMeters = mapView.visibleMapRect.size.width
+                * MKMetersPerMapPointAtLatitude(mapView.centerCoordinate.latitude)
+            let screenWidth = Double(mapView.bounds.width)
+            guard screenWidth > 0, visibleMeters > 0, visibleMeters.isFinite else {
+                return .greatestFiniteMagnitude
+            }
+            return CGFloat(H3Grid.edgeMeters / (visibleMeters / screenWidth))
+        }
+
+        private static func scaledStrokeWidth(
+            hexEdgeScreenPoints: CGFloat,
+            min minimum: CGFloat,
+            max maximum: CGFloat,
+            fraction: CGFloat
+        ) -> CGFloat {
+            guard hexEdgeScreenPoints.isFinite else { return maximum }
+            return Swift.min(maximum, Swift.max(minimum, hexEdgeScreenPoints * fraction))
         }
 
         private func visibleClaimCellsByOwner() -> [String: Set<UInt64>] {
@@ -282,12 +327,22 @@ public struct HexMapView: UIViewRepresentable {
         }
 
         @MainActor
-        private func updateVisibleCells(for region: MKCoordinateRegion) {
-            let cells = H3Grid.visibleCellIds(for: region)
-            guard cells != visibleClaimCells else { return }
-            visibleClaimCells = cells
+        func updateVisibleCells(for mapView: MKMapView) {
+            let syncCells = H3Grid.visibleCellIds(for: mapView.region)
+            if syncCells != visibleSyncCells {
+                visibleSyncCells = syncCells
+                onVisibleCellsChange(syncCells)
+            }
+
+            let claimCells = syncCells.isEmpty
+                ? H3Grid.visibleClaimedCellIds(
+                    in: mapView.visibleMapRect,
+                    from: store.tiles.keys
+                )
+                : syncCells
+            guard claimCells != visibleClaimCells else { return }
+            visibleClaimCells = claimCells
             syncClaimedOverlay()
-            onVisibleCellsChange(cells)
         }
 
         public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
@@ -366,7 +421,7 @@ public struct HexMapView: UIViewRepresentable {
                 let renderer = MKPolygonRenderer(polygon: homeOverlay)
                 renderer.fillColor = UIColor.systemYellow.withAlphaComponent(0.35)
                 renderer.strokeColor = UIColor.systemYellow
-                renderer.lineWidth = 3
+                renderer.lineWidth = homeOutlineWidth(for: mapView)
                 return renderer
             }
             guard let multiPolygon = overlay as? MKMultiPolygon else {
@@ -382,7 +437,7 @@ public struct HexMapView: UIViewRepresentable {
                 // territory outer border only
                 renderer.fillColor = .clear
                 renderer.strokeColor = color
-                renderer.lineWidth = 1.5
+                renderer.lineWidth = territoryOutlineWidth(for: mapView)
             } else {
                 renderer.fillColor = .clear
                 renderer.strokeColor = UIColor.label.withAlphaComponent(0.3)
@@ -395,6 +450,7 @@ public struct HexMapView: UIViewRepresentable {
             var visibleOwners: [UInt64: String]
             var playerColors: [String: String]
             var localHomeCell: UInt64
+            var strokeWidthBand: Int
         }
     }
 }

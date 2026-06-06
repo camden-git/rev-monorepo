@@ -50,6 +50,21 @@ public enum H3Grid {
         Set(coveringCells(for: region, paddingRings: paddingRings, maxCells: maxVisibleTileCells).map(\.id))
     }
 
+    static func visibleClaimedCellIds<C: Sequence>(
+        in visibleMapRect: MKMapRect,
+        from cellIds: C,
+        paddingFraction: Double = 0.08
+    ) -> Set<UInt64> where C.Element == UInt64 {
+        let paddedRect = visibleMapRect.insetBy(
+            dx: -visibleMapRect.size.width * paddingFraction,
+            dy: -visibleMapRect.size.height * paddingFraction
+        )
+        return Set(cellIds.compactMap { id in
+            guard let center = try? H3Cell(id).center.coordinates else { return nil }
+            return paddedRect.contains(MKMapPoint(center)) ? id : nil
+        })
+    }
+
     static func showsGrid(for region: MKCoordinateRegion) -> Bool {
         !coveringCells(for: region).isEmpty
     }
