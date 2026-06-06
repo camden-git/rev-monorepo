@@ -312,10 +312,11 @@ public struct HexMapView: UIViewRepresentable {
 
         /// tap a hex to see who owns it and at what (decayed) score, via an
         /// inspector sheet owned by SwiftUI REF: docs/tech-stack.md
-        /// §Map Rendering — tap handling.
+        /// §Map Rendering - tap handling.
         @MainActor
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let mapView else { return }
+            guard H3Grid.showsGrid(for: mapView.region) else { return }
             let point = gesture.location(in: mapView)
             let coordinate = mapView.convert(point, toCoordinateFrom: mapView)
             guard let cell = H3Grid.cell(for: coordinate) else { return }

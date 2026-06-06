@@ -50,6 +50,10 @@ public enum H3Grid {
         Set(coveringCells(for: region, paddingRings: paddingRings, maxCells: maxVisibleTileCells).map(\.id))
     }
 
+    static func showsGrid(for region: MKCoordinateRegion) -> Bool {
+        !coveringCells(for: region).isEmpty
+    }
+
     /// outline per hex
     static func gridOverlay(for cells: [H3Cell]) -> MKMultiPolygon {
         let polygons = cells.compactMap { cell -> MKPolygon? in
