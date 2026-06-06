@@ -226,4 +226,151 @@ struct TileSyncEngineTests {
         #expect(client.listUsersCallCount == 0)
         #expect(sync.lastError == nil)
     }
+
+    @Test func rosterFailureAfterTilePollIsDebugOnly() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        client.onListTiles = { _ in [] }
+        client.onListUsers = {
+            throw PocketBaseError.decoding("missing display_name")
+        }
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: InMemoryTokenStore(),
+            cursor: InMemorySyncCursor()
+        )
+        sync.adoptSession(AuthResponse(token: "tok", record: AuthUserDTO(id: "u-debug", email: nil, displayName: nil)))
+
+        await sync.pollTiles()
+
+        #expect(sync.lastError == nil)
+        #expect(sync.lastErrorKind == nil)
+        #expect(sync.lastDebugMessage?.contains("operation=syncRoster") == true)
+    }
+
+    @Test func visibleTileFailureIsDebugOnlyUnlessAuthFails() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        client.onListTilesForCells = { _ in
+            throw PocketBaseError.http(status: 500, body: "window failed")
+        }
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: InMemoryTokenStore(),
+            cursor: InMemorySyncCursor()
+        )
+        sync.adoptSession(AuthResponse(token: "tok", record: AuthUserDTO(id: "u-debug", email: nil, displayName: nil)))
+
+        await sync.pollVisibleTiles(h3Cells: [SyncFixtures.cell])
+
+        #expect(sync.lastError == nil)
+        #expect(sync.lastErrorKind == nil)
+        #expect(sync.lastDebugMessage?.contains("operation=pollVisibleTiles") == true)
+    }
+
+    @Test func invalidStoredSessionClearsTokenAndRequiresSignIn() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        client.onAuthRefresh = {
+            throw PocketBaseError.http(status: 401, body: #"{"message":"The request requires valid record authorization token."}"#)
+        }
+        let tokenStore = InMemoryTokenStore(token: "stale-token")
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: tokenStore,
+            cursor: InMemorySyncCursor()
+        )
+
+        await sync.restoreSessionIfPossible()
+
+        #expect(sync.currentUserId == nil)
+        #expect(tokenStore.load() == nil)
+        #expect(sync.requiresSignIn)
+        #expect(sync.lastError == "Your session expired. Sign in again to keep syncing.")
+    }
+
+    @Test func unavailableServerDuringSessionRestoreDoesNotRequireSignIn() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        client.onAuthRefresh = {
+            throw URLError(.cannotConnectToHost)
+        }
+        let tokenStore = InMemoryTokenStore(token: "stored-token")
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: tokenStore,
+            cursor: InMemorySyncCursor()
+        )
+
+        await sync.restoreSessionIfPossible()
+
+        #expect(sync.currentUserId == nil)
+        #expect(tokenStore.load() == "stored-token")
+        #expect(!sync.requiresSignIn)
+        #expect(sync.canRetrySessionRestore)
+        #expect(sync.lastErrorKind == .unavailable)
+        #expect(sync.lastError == "Server unreachable. Your local progress is saved.")
+    }
+
+    @Test func retrySessionRestoreAfterUnavailableServerCanRecover() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        let counter = Counter()
+        client.onAuthRefresh = {
+            if counter.next() == 0 {
+                throw URLError(.cannotConnectToHost)
+            }
+            return AuthResponse(token: "fresh-token", record: AuthUserDTO(id: "u-restored", email: nil, displayName: "Cam"))
+        }
+        let tokenStore = InMemoryTokenStore(token: "stored-token")
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: tokenStore,
+            cursor: InMemorySyncCursor()
+        )
+
+        await sync.restoreSessionIfPossible()
+        await sync.retrySessionRestore()
+
+        #expect(sync.currentUserId == "u-restored")
+        #expect(tokenStore.load() == "fresh-token")
+        #expect(!sync.requiresSignIn)
+        #expect(!sync.canRetrySessionRestore)
+        #expect(sync.lastError == nil)
+        #expect(sync.lastErrorKind == nil)
+    }
+
+    @Test func authFailureDuringSyncInvalidatesCurrentSession() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        client.onListTiles = { _ in
+            throw PocketBaseError.http(status: 403, body: #"{"message":"The request requires valid record authorization token."}"#)
+        }
+        let tokenStore = InMemoryTokenStore()
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: tokenStore,
+            cursor: InMemorySyncCursor()
+        )
+        sync.adoptSession(AuthResponse(token: "bad-token", record: AuthUserDTO(id: "u-expired", email: nil, displayName: nil)))
+
+        await sync.pollTiles()
+
+        #expect(sync.currentUserId == nil)
+        #expect(tokenStore.load() == nil)
+        #expect(sync.requiresSignIn)
+        #expect(client.listUsersCallCount == 0)
+    }
 }

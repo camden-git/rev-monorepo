@@ -49,8 +49,8 @@ public struct PocketBaseConfig: Sendable {
 
     /// prod API
     public static let production = PocketBaseConfig(
-        baseURL: URL(string: "https://api.driverev.app")!,
-        appleRedirectURL: "https://api.driverev.app/api/oauth2-redirect"
+        baseURL: URL(string: "https://driverev.app")!,
+        appleRedirectURL: "https://driverev.app/api/oauth2-redirect"
     )
 
     /// local PocketBase for simulator development

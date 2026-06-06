@@ -19,7 +19,6 @@ struct PocketBaseClientTests {
 
         let cell = SyncFixtures.cell
         let payload = DriveUploadPayload(
-            user: "user1",
             startedAt: Date(timeIntervalSince1970: 1_000_000),
             endedAt: Date(timeIntervalSince1970: 1_000_100),
             rawPath: [GPSSample(timestamp: Date(timeIntervalSince1970: 1_000_000), lat: 41.88, lng: -87.62, speed: 10, accuracy: 5)],
@@ -36,7 +35,7 @@ struct PocketBaseClientTests {
 
         // this tests exactness
         let json = try JSONSerialization.jsonObject(with: try #require(req.httpBody)) as? [String: Any]
-        #expect(json?["user"] as? String == "user1")
+        #expect(json?["user"] == nil)
         #expect(json?["raw_path"] != nil)
         let scores = json?["per_tile_scores"] as? [String: Any]
         #expect(scores?["\(cell)"] as? Double == 32.5)
@@ -208,5 +207,15 @@ struct PocketBaseClientTests {
         await #expect(throws: PocketBaseError.self) {
             _ = try await client.listTiles(updatedSince: nil)
         }
+    }
+
+    @Test func authedRequestWithoutTokenFailsBeforeNetwork() async throws {
+        let transport = MockHTTPTransport { _ in (Data(), httpResponse(200)) }
+        let client = makeClient(transport, token: nil)
+
+        await #expect(throws: PocketBaseError.self) {
+            _ = try await client.listUsers()
+        }
+        #expect(transport.requests.isEmpty)
     }
 }

@@ -118,11 +118,10 @@ enum SyncFixtures {
     /// a real res-10 H3 cell id (> 2^53)
     static let cell: UInt64 = H3Grid.cellId(for: .init(latitude: 41.8807, longitude: -87.6294))!
 
-    static func payload(user: String = "user1", id: UUID = UUID()) -> PendingDrive {
+    static func payload(id: UUID = UUID()) -> PendingDrive {
         PendingDrive(
             id: id,
             payload: DriveUploadPayload(
-                user: user,
                 startedAt: Date(timeIntervalSince1970: 1_000_000),
                 endedAt: Date(timeIntervalSince1970: 1_000_120),
                 rawPath: [GPSSample(timestamp: Date(timeIntervalSince1970: 1_000_000), lat: 41.88, lng: -87.62, speed: 12, accuracy: 5)],

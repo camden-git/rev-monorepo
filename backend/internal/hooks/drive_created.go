@@ -14,6 +14,13 @@ import (
 
 // RegisterDriveHooks attaches the drive-resolution hook to the app
 func RegisterDriveHooks(app core.App) {
+	app.OnRecordCreateRequest("drives").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := stampDriveOwner(e); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+
 	app.OnRecordAfterCreateSuccess("drives").BindFunc(func(e *core.RecordEvent) error {
 		// the drive is already persisted. Resolution runs in its own transaction,
 		// if it fails we log and still return success so the client's upload queue
@@ -23,6 +30,14 @@ func RegisterDriveHooks(app core.App) {
 		}
 		return e.Next()
 	})
+}
+
+func stampDriveOwner(e *core.RecordRequestEvent) error {
+	if e.Auth == nil || !e.Auth.Collection().IsAuth() || e.Auth.Collection().Name != "users" {
+		return e.UnauthorizedError("Drive uploads require a signed-in user.", nil)
+	}
+	e.Record.Set("user", e.Auth.Id)
+	return nil
 }
 
 // gpsSample is the slice of drives.raw_path the server uses

@@ -5,12 +5,14 @@ import SwiftUI
 struct HomeDrawer: View {
     let store: TerritoryStore
     let tracker: DriveTracker
+    let signIn: AppleSignInCoordinator
     let sync: SyncService
     
     @Binding var selectedTile: HexTileDetail?
     @Binding var showSummary: Bool
 
     @State private var showProfile = false
+    @State private var showSessionRecovery = false
     @State private var selectedDrive: DriveRecord?
 
     var body: some View {
@@ -48,6 +50,10 @@ struct HomeDrawer: View {
                 recordingHUD
             }
 
+            if sync.requiresSignIn {
+                sessionRecoveryButton
+            }
+
             HStack(spacing: 12) {
                 Button {
                     if tracker.isRecording { tracker.endDrive() } else { tracker.startDrive() }
@@ -77,6 +83,26 @@ struct HomeDrawer: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showSessionRecovery) {
+            SessionRecoveryView(signIn: signIn, sync: sync) {
+                showSessionRecovery = false
+            }
+            .presentationDetents([.height(420), .medium])
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled(sync.requiresSignIn)
+        }
+        .onAppear {
+            if sync.requiresSignIn {
+                showSessionRecovery = true
+            }
+        }
+        .onChange(of: sync.requiresSignIn) { _, needsSignIn in
+            if needsSignIn {
+                showSessionRecovery = true
+            } else {
+                showSessionRecovery = false
+            }
+        }
         .sheet(isPresented: $showSummary) {
             if let summary = tracker.lastDriveSummary {
                 DriveSummaryView(summary: summary, store: store) { showSummary = false }
@@ -84,6 +110,37 @@ struct HomeDrawer: View {
                     .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    private var sessionRecoveryButton: some View {
+        Button {
+            showSessionRecovery = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "person.crop.circle.badge.exclamationmark")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sessionRecoveryTitle)
+                        .font(.subheadline.weight(.semibold))
+                    Text(sync.lastError ?? "Rev cannot sync until your session is refreshed.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sessionRecoveryTitle: String {
+        sync.lastErrorKind == .authenticationRequired ? "Sign in again" : "Sign in to sync"
     }
 
     private var recordingHUD: some View {

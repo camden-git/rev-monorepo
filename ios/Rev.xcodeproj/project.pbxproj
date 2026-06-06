@@ -41,6 +41,8 @@
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
 		AC0673B770485F7009C4E40F /* ViewStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewStyles.swift; sourceTree = "<group>"; };
 		D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDrawer.swift; sourceTree = "<group>"; };
+		E9485FD72FD3DC9100975FC1 /* chicago-loop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-loop.gpx"; path = "../scripts/chicago-loop.gpx"; sourceTree = "<group>"; };
+		E9485FD82FD3E94F00975FC1 /* chicago-drive.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-drive.gpx"; path = "../scripts/chicago-drive.gpx"; sourceTree = "<group>"; };
 		F23E45A1D168FC97A7B75918 /* TileDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDetailView.swift; sourceTree = "<group>"; };
 		FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerAvatar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -107,6 +109,8 @@
 		B70B2AEF25D0AE17A0127E4F = {
 			isa = PBXGroup;
 			children = (
+				E9485FD82FD3E94F00975FC1 /* chicago-drive.gpx */,
+				E9485FD72FD3DC9100975FC1 /* chicago-loop.gpx */,
 				71FA7C28AE8D30D4F8AAF814 /* Packages */,
 				67C259D607CD7F162B12DE16 /* Rev */,
 				7232386AC9B9B6FFF0843CC7 /* Products */,

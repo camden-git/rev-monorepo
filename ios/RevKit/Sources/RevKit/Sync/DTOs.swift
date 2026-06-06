@@ -6,14 +6,12 @@ import Foundation
 
 /// POST body for `POST /api/collections/drives/records`
 public struct DriveUploadPayload: Encodable, Sendable {
-    public let user: String
     public let startedAt: Date
     public let endedAt: Date?
     public let rawPath: [GPSSample]
     public let perTileScores: PerTileScores
 
-    public init(user: String, startedAt: Date, endedAt: Date?, rawPath: [GPSSample], perTileScores: [UInt64: Double]) {
-        self.user = user
+    public init(startedAt: Date, endedAt: Date?, rawPath: [GPSSample], perTileScores: [UInt64: Double]) {
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.rawPath = rawPath
@@ -21,7 +19,6 @@ public struct DriveUploadPayload: Encodable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case user
         case startedAt = "started_at"
         case endedAt = "ended_at"
         case rawPath = "raw_path"

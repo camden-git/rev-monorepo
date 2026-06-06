@@ -164,8 +164,9 @@ struct OnboardingView: View {
     }
 }
 
-private struct InviteSignInView: View {
+struct InviteSignInView: View {
     let sync: SyncService
+    var onSignedIn: () -> Void = {}
 
     @State private var displayName = ""
     @State private var email = ""
@@ -242,6 +243,9 @@ private struct InviteSignInView: View {
             email: email.trimmingCharacters(in: .whitespacesAndNewlines),
             code: code.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+        if sync.isSignedIn {
+            onSignedIn()
+        }
     }
 }
 

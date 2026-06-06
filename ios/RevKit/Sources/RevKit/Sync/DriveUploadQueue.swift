@@ -14,8 +14,7 @@ public struct PendingDrive: Sendable, Equatable {
 
 extension DriveUploadPayload: Equatable {
     public static func == (lhs: DriveUploadPayload, rhs: DriveUploadPayload) -> Bool {
-        lhs.user == rhs.user
-            && lhs.startedAt == rhs.startedAt
+        lhs.startedAt == rhs.startedAt
             && lhs.endedAt == rhs.endedAt
             && lhs.rawPath == rhs.rawPath
             && lhs.perTileScores == rhs.perTileScores
@@ -43,7 +42,7 @@ public final class DriveUploadQueue {
 
     /// upload every pending drive
     @discardableResult
-    public func drain() async -> (uploaded: Int, failed: Bool) {
+    public func drain() async -> (uploaded: Int, failed: Bool, error: Error?) {
         var uploaded = 0
         for pending in source.unsent() {
             do {
@@ -51,27 +50,22 @@ public final class DriveUploadQueue {
                 source.markUploaded(pending.id)
                 uploaded += 1
             } catch {
-                return (uploaded, true)
+                return (uploaded, true, error)
             }
         }
-        return (uploaded, false)
+        return (uploaded, false, nil)
     }
 }
 
 /// SwiftData-backed source: reads unsent `DriveRecord`s and maps them to upload
-/// payloads, then flips `uploaded` once the server accepts them.
-///
-/// FUTURE (server-side): `userID` is the authenticated PocketBase user id. Until
-/// Sign in with Apple is wired, uploads are gated on having one (the local
-/// player's id is not a server id).
+/// payloads, then flips `uploaded` once the server accepts them. the backend
+/// assigns the drive owner from the auth token
 @MainActor
 public final class SwiftDataDriveSource: UnsentDriveSource {
     private let context: ModelContext
-    private let userID: String
 
-    public init(context: ModelContext, userID: String) {
+    public init(context: ModelContext) {
         self.context = context
-        self.userID = userID
     }
 
     public func unsent() -> [PendingDrive] {
@@ -84,7 +78,6 @@ public final class SwiftDataDriveSource: UnsentDriveSource {
             PendingDrive(
                 id: record.id,
                 payload: DriveUploadPayload(
-                    user: userID,
                     startedAt: record.startedAt,
                     endedAt: record.endedAt,
                     rawPath: record.rawPath,

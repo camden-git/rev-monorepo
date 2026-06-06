@@ -1,5 +1,17 @@
 import Foundation
+#if canImport(os)
+import os
+#endif
 import SwiftData
+
+public enum SyncErrorKind: Equatable, Sendable {
+    case authenticationRequired
+    case missingSession
+    case unavailable
+    case server
+    case response
+    case unknown
+}
 
 /// entry point to backend
 @MainActor
@@ -14,9 +26,16 @@ public final class SyncService {
     /// authenticated PocketBase user id, or nil when signed out
     public private(set) var currentUserId: String?
     public private(set) var lastError: String?
+    public private(set) var lastErrorKind: SyncErrorKind?
+    public private(set) var lastDebugMessage: String?
+    public private(set) var isRestoringSession = false
     private var attemptedSessionRestore = false
     private var currentVisibleTileCells: Set<UInt64> = []
     private var currentVisibleTileParents: Set<UInt64> = []
+
+    #if canImport(os)
+    private let logger = Logger(subsystem: "app.driverev.RevKit", category: "SyncService")
+    #endif
 
     public convenience init(
         store: TerritoryStore,
@@ -50,6 +69,12 @@ public final class SyncService {
     }
 
     public var isSignedIn: Bool { currentUserId != nil }
+    public var requiresSignIn: Bool {
+        lastErrorKind == .authenticationRequired || lastErrorKind == .missingSession
+    }
+    public var canRetrySessionRestore: Bool {
+        currentUserId == nil && tokenStore.load() != nil && !isRestoringSession && !requiresSignIn
+    }
 
     /// adopt a session from an external auth flow (e.g. Sign in with Apple)
     /// reconciles the local player's local id onto the authenticated PocketBase
@@ -57,27 +82,41 @@ public final class SyncService {
     public func adoptSession(_ response: AuthResponse) {
         tokenStore.save(response.token)
         currentUserId = response.record.id
+        attemptedSessionRestore = true
+        lastErrorKind = nil
         store.reconcileLocalIdentity(to: response.record.id)
         if let name = response.record.displayName { store.setLocalDisplayName(name) }
     }
 
     /// roster + profile refresh to run after any successful sign-in:
     public func refreshAfterSignIn() async {
-        await pushProfile()
+        guard await pushProfile() else { return }
         await syncRoster()
     }
 
     public func restoreSessionIfPossible() async {
         guard !attemptedSessionRestore, currentUserId == nil, tokenStore.load() != nil else { return }
+        await restoreStoredSession()
+    }
+
+    public func retrySessionRestore() async {
+        guard canRetrySessionRestore else { return }
+        await restoreStoredSession()
+    }
+
+    private func restoreStoredSession() async {
         attemptedSessionRestore = true
+        isRestoringSession = true
+        defer { isRestoringSession = false }
         do {
             let response = try await client.authRefresh()
             adoptSession(response)
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
             await refreshAfterSignIn()
         } catch {
-            tokenStore.clear()
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "restoreSession")
         }
     }
 
@@ -86,19 +125,25 @@ public final class SyncService {
             let response = try await client.authWithInvite(displayName: displayName, email: email, code: code)
             adoptSession(response)
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
             await refreshAfterSignIn()
         } catch {
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "signInWithInvite")
         }
     }
 
     /// upload every locally-recorded drive that hasn't synced yet, then refresh
     /// tiles so the provisional local state is reconciled with the server
     public func uploadPending() async {
-        guard let userId = currentUserId else { return }
-        let source = SwiftDataDriveSource(context: context, userID: userId)
+        guard currentUserId != nil else { return }
+        let source = SwiftDataDriveSource(context: context)
         let queue = DriveUploadQueue(client: client, source: source)
         let result = await queue.drain()
+        if let error = result.error {
+            recordSyncFailure(error, operation: "uploadPending")
+            return
+        }
         if result.uploaded > 0, !currentVisibleTileCells.isEmpty {
             await pollVisibleTiles(h3Cells: currentVisibleTileCells, force: true)
         }
@@ -109,8 +154,10 @@ public final class SyncService {
         do {
             _ = try await TileSyncEngine(client: client, store: store, cursor: cursor).sync()
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
         } catch {
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "pollTiles", visible: false)
             return
         }
         await syncRoster()
@@ -130,8 +177,10 @@ public final class SyncService {
         do {
             _ = try await TileSyncEngine(client: client, store: store, cursor: cursor).sync(h3Cells: h3Cells)
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
         } catch {
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "pollVisibleTiles", visible: false)
         }
     }
 
@@ -142,8 +191,10 @@ public final class SyncService {
             let players = try await client.listUsers()
             store.applyRemotePlayers(players)
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
         } catch {
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "syncRoster", visible: false)
         }
     }
 
@@ -161,11 +212,20 @@ public final class SyncService {
                 displayName: local.displayName
             )
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
             return true
         } catch {
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "pushProfile")
             return false
         }
+    }
+
+    public func signOut() {
+        clearSession()
+        lastError = nil
+        lastErrorKind = nil
+        lastDebugMessage = nil
     }
 
     #if DEBUG
@@ -175,10 +235,130 @@ public final class SyncService {
             let response = try await client.authWithPassword(identity: identity, password: password)
             adoptSession(response)
             lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
             await refreshAfterSignIn()
         } catch {
-            lastError = String(describing: error)
+            recordSyncFailure(error, operation: "devSignIn")
         }
     }
     #endif
+
+    private func recordSyncFailure(_ error: Error, operation: String, visible: Bool = true) {
+        let authFailure = isAuthenticationFailure(error)
+        if authFailure {
+            clearSession()
+        }
+        let kind = errorKind(for: error)
+        let debugMessage = debugMessage(for: error, operation: operation, kind: kind)
+        lastDebugMessage = debugMessage
+        logSyncFailure(debugMessage)
+
+        guard visible || authFailure else { return }
+        lastErrorKind = kind
+        lastError = userFacingMessage(for: error)
+    }
+
+    private func clearSession() {
+        tokenStore.clear()
+        currentUserId = nil
+    }
+
+    private func isAuthenticationFailure(_ error: Error) -> Bool {
+        guard let pocketBaseError = error as? PocketBaseError else { return false }
+        switch pocketBaseError {
+        case .notAuthenticated:
+            return true
+        case .http(let status, _):
+            return status == 401 || status == 403
+        case .decoding, .invalidResponse:
+            return false
+        }
+    }
+
+    private func userFacingMessage(for error: Error) -> String {
+        if let pocketBaseError = error as? PocketBaseError, pocketBaseError == .notAuthenticated {
+            return "Sign in to keep syncing."
+        }
+        if isAuthenticationFailure(error) {
+            return "Your session expired. Sign in again to keep syncing."
+        }
+        if let pocketBaseError = error as? PocketBaseError {
+            switch pocketBaseError {
+            case .http(let status, _):
+                return "Server error \(status). Your local progress is saved."
+            case .decoding:
+                return "Sync failed because the server response was unexpected."
+            case .invalidResponse:
+                return "Sync failed because the server response was invalid."
+            case .notAuthenticated:
+                return "Sign in to keep syncing."
+            }
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .timedOut:
+                return "Server unreachable. Your local progress is saved."
+            default:
+                break
+            }
+        }
+        return "Sync failed. Try again in a moment."
+    }
+
+    private func errorKind(for error: Error) -> SyncErrorKind {
+        if let pocketBaseError = error as? PocketBaseError {
+            switch pocketBaseError {
+            case .notAuthenticated:
+                return .missingSession
+            case .http:
+                if isAuthenticationFailure(error) {
+                    return .authenticationRequired
+                }
+                return .server
+            case .decoding, .invalidResponse:
+                return .response
+            }
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .timedOut, .cannotFindHost, .dnsLookupFailed:
+                return .unavailable
+            default:
+                return .unknown
+            }
+        }
+        return .unknown
+    }
+
+    private func debugMessage(for error: Error, operation: String, kind: SyncErrorKind) -> String {
+        "operation=\(operation) kind=\(kind) error=\(debugDescription(for: error))"
+    }
+
+    private func debugDescription(for error: Error) -> String {
+        if let pocketBaseError = error as? PocketBaseError {
+            switch pocketBaseError {
+            case .http(let status, let body):
+                return "PocketBase HTTP \(status) body=\(body)"
+            case .notAuthenticated:
+                return "PocketBase request missing auth token"
+            case .decoding(let message):
+                return "PocketBase decode failure \(message)"
+            case .invalidResponse:
+                return "PocketBase invalid HTTP response"
+            }
+        }
+        if let urlError = error as? URLError {
+            return "URLError \(urlError.code.rawValue) \(urlError.localizedDescription)"
+        }
+        return String(describing: error)
+    }
+
+    private func logSyncFailure(_ message: String) {
+        #if canImport(os)
+        logger.error("\(message, privacy: .public)")
+        #else
+        print("SyncService failure: \(message)")
+        #endif
+    }
 }

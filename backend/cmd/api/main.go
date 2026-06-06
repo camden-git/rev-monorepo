@@ -22,6 +22,7 @@ func main() {
 	})
 
 	hooks.RegisterDriveHooks(app)
+	hooks.RegisterUserHooks(app)
 	routes.RegisterInviteAuthRoutes(app)
 	routes.RegisterTileRoutes(app)
 

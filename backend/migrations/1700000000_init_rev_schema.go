@@ -65,11 +65,11 @@ func up(app core.App) error {
 	// drives
 	// authenticated users create/read only their own drives
 	drives := core.NewBaseCollection("drives")
-	drives.CreateRule = ptr(`@request.auth.id != "" && @request.body.user = @request.auth.id`)
+	drives.CreateRule = ptr(`@request.auth.id != ""`)
 	drives.ListRule = ptr("user = @request.auth.id")
 	drives.ViewRule = ptr("user = @request.auth.id")
 	drives.Fields.Add(
-		&core.RelationField{Name: "user", CollectionId: users.Id, MaxSelect: 1, CascadeDelete: true},
+		&core.RelationField{Name: "user", CollectionId: users.Id, MaxSelect: 1, Required: true, CascadeDelete: true},
 		&core.DateField{Name: "started_at"},
 		&core.DateField{Name: "ended_at"},
 		&core.JSONField{Name: "raw_path", MaxSize: 5 << 20},        // [{ts,lat,lng,speed,accuracy}]

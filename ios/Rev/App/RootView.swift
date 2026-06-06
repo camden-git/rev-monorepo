@@ -63,6 +63,7 @@ struct RootView: View {
         )
             .ignoresSafeArea()
             .overlay(alignment: .top) { toast }
+            .safeAreaInset(edge: .top) { syncStatusBanner }
             .task {
                 tracker.start()
             }
@@ -80,6 +81,7 @@ struct RootView: View {
                 HomeDrawer(
                     store: store,
                     tracker: tracker,
+                    signIn: signIn,
                     sync: sync,
                     selectedTile: $selectedTile,
                     showSummary: $showSummary
@@ -144,6 +146,59 @@ struct RootView: View {
         .font(.subheadline.weight(.medium))
     }
 
+    @ViewBuilder
+    private var syncStatusBanner: some View {
+        if let message = sync.lastError {
+            HStack(spacing: 10) {
+                Image(systemName: syncStatusIcon)
+                    .foregroundStyle(syncStatusTint)
+                Text(message)
+                    .font(.footnote.weight(.medium))
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                if sync.isRestoringSession {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if sync.canRetrySessionRestore {
+                    Button {
+                        Task { await sync.retrySessionRestore() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.footnote.weight(.semibold))
+                            .frame(width: 30, height: 30)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Retry sync")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: Capsule())
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+        }
+    }
+
+    private var syncStatusIcon: String {
+        switch sync.lastErrorKind {
+        case .authenticationRequired, .missingSession:
+            return "person.crop.circle.badge.exclamationmark"
+        case .unavailable:
+            return "wifi.exclamationmark"
+        case .server, .response, .unknown, nil:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var syncStatusTint: Color {
+        switch sync.lastErrorKind {
+        case .authenticationRequired, .missingSession, .server, .response, .unknown, nil:
+            return .orange
+        case .unavailable:
+            return .yellow
+        }
+    }
+
     private func expandToastToSheet() {
         toastTask?.cancel()
         withAnimation { showToast = false }
@@ -155,6 +210,47 @@ struct RootView: View {
         if s.totalCaptured > 0 { parts.append("\(s.totalCaptured) captured") }
         if s.tilesEnclosed > 0 { parts.append("\(s.tilesEnclosed) enclosed") }
         return parts.joined(separator: " · ")
+    }
+}
+
+struct SessionRecoveryView: View {
+    let signIn: AppleSignInCoordinator
+    let sync: SyncService
+    var onSignedIn: () -> Void = {}
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 42, weight: .semibold))
+                .foregroundStyle(.orange)
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                Text(sync.lastError ?? "Your session needs to be refreshed before Rev can sync.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            InviteSignInView(sync: sync) {
+                onSignedIn()
+            }
+
+            AppleSignInButton(coordinator: signIn) { response in
+                sync.adoptSession(response)
+                Task { @MainActor in
+                    await sync.refreshAfterSignIn()
+                    onSignedIn()
+                }
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var title: String {
+        sync.lastErrorKind == .authenticationRequired ? "Sign in again" : "Sign in to sync"
     }
 }
 
