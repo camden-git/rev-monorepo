@@ -37,3 +37,6 @@ backend/pb_data/*
 
 # extras
 *.sql.gz
+
+# docs
+docs/
