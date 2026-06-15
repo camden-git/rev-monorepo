@@ -25,6 +25,7 @@ func main() {
 	hooks.RegisterUserHooks(app)
 	routes.RegisterInviteAuthRoutes(app)
 	routes.RegisterTileRoutes(app)
+	routes.RegisterAccountRoutes(app)
 
 	// local dev stuff
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
