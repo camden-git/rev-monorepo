@@ -181,9 +181,12 @@ public final class SyncService {
             return
         }
         currentVisibleTileCells = h3Cells
-        currentVisibleTileParents = parents
         do {
             _ = try await TileSyncEngine(client: client, store: store, cursor: cursor).sync(h3Cells: h3Cells)
+            // only cache the viewport after a successful fetch, otherwise a window
+            // poll that failed on a blip would be treated as already-loaded and the
+            // current view's tiles would stay missing until the user pans away and back
+            currentVisibleTileParents = parents
             lastError = nil
             lastErrorKind = nil
             lastDebugMessage = nil

@@ -143,6 +143,35 @@ struct RealtimeSyncTests {
         #expect(!realtime.isRunning)
     }
 
+    // MARK: visible-tile polling
+
+    @Test func visibleTilePollRetriesAfterAFailedFetch() async throws {
+        let client = MockPocketBaseClient()
+        let counter = Counter()
+        client.onListTilesForCells = { _ in
+            if counter.next() == 0 { throw URLError(.timedOut) }
+            return []
+        }
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+        let cells: Set<UInt64> = [SyncFixtures.cell]
+
+        await sync.pollVisibleTiles(h3Cells: cells) // fails, must not cache the viewport
+        await sync.pollVisibleTiles(h3Cells: cells) // same view, must retry rather than dedupe
+
+        #expect(client.listCellArgs.count == 2)
+    }
+
+    @Test func visibleTilePollDedupesAfterSuccess() async throws {
+        let client = MockPocketBaseClient() // default returns []
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+        let cells: Set<UInt64> = [SyncFixtures.cell]
+
+        await sync.pollVisibleTiles(h3Cells: cells) // success caches the viewport
+        await sync.pollVisibleTiles(h3Cells: cells) // identical view is skipped
+
+        #expect(client.listCellArgs.count == 1)
+    }
+
     // MARK: session liveness
 
     @Test func verifySessionClearsSessionWhenServerRevokedToken() async throws {
