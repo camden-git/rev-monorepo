@@ -21,13 +21,14 @@ struct RealtimeSyncTests {
     private func makeSync(
         store: TerritoryStore,
         client: PocketBaseClient,
-        realtime: TileRealtimeClient
+        realtime: TileRealtimeClient,
+        tokenStore: TokenStore = InMemoryTokenStore()
     ) -> SyncService {
         SyncService(
             store: store,
             context: Self.container.mainContext,
             client: client,
-            tokenStore: InMemoryTokenStore(),
+            tokenStore: tokenStore,
             cursor: InMemorySyncCursor(),
             realtime: realtime
         )
@@ -140,6 +141,88 @@ struct RealtimeSyncTests {
         #expect(sync.currentUserId == nil)
         #expect(realtime.stopCount == 1)
         #expect(!realtime.isRunning)
+    }
+
+    // MARK: session liveness
+
+    @Test func verifySessionClearsSessionWhenServerRevokedToken() async throws {
+        let client = MockPocketBaseClient()
+        client.onAuthRefresh = { throw PocketBaseError.http(status: 401, body: #"{"message":"expired"}"#) }
+        let tokenStore = InMemoryTokenStore()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient(), tokenStore: tokenStore)
+        sync.adoptSession(AuthResponse(token: "dead", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        await sync.verifySession()
+
+        #expect(sync.currentUserId == nil)
+        #expect(sync.requiresSignIn)
+        #expect(tokenStore.load() == nil)
+    }
+
+    @Test func verifySessionKeepsSessionWhenOffline() async throws {
+        let client = MockPocketBaseClient()
+        client.onAuthRefresh = { throw URLError(.notConnectedToInternet) }
+        let tokenStore = InMemoryTokenStore()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient(), tokenStore: tokenStore)
+        sync.adoptSession(AuthResponse(token: "good", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        await sync.verifySession()
+
+        // a network blip must not sign the user out
+        #expect(sync.currentUserId == "me")
+        #expect(!sync.requiresSignIn)
+        #expect(tokenStore.load() == "good")
+    }
+
+    @Test func verifySessionRotatesTokenOnSuccess() async throws {
+        let client = MockPocketBaseClient()
+        client.onAuthRefresh = {
+            AuthResponse(token: "rotated", record: AuthUserDTO(id: "me", email: nil, displayName: nil))
+        }
+        let tokenStore = InMemoryTokenStore()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient(), tokenStore: tokenStore)
+        sync.adoptSession(AuthResponse(token: "old", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        await sync.verifySession()
+
+        #expect(sync.currentUserId == "me")
+        #expect(tokenStore.load() == "rotated")
+    }
+
+    @Test func verifySessionSkippedWhenSignedOut() async throws {
+        let client = MockPocketBaseClient()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+
+        await sync.verifySession()
+
+        #expect(client.authRefreshCount == 0)
+    }
+
+    @Test func heartbeatVerifiesImmediatelyThenStops() async throws {
+        let client = MockPocketBaseClient()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+        sync.adoptSession(AuthResponse(token: "good", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        sync.startHeartbeat(interval: .seconds(30))
+        // the first verify fires immediately, before any interval elapses
+        try await waitUntil { client.authRefreshCount >= 1 }
+        sync.stopHeartbeat()
+
+        #expect(client.authRefreshCount >= 1)
+    }
+
+    @Test func heartbeatIsIdempotentWhileRunning() async throws {
+        let client = MockPocketBaseClient()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+        sync.adoptSession(AuthResponse(token: "good", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        sync.startHeartbeat(interval: .seconds(30))
+        sync.startHeartbeat(interval: .seconds(30))
+        try await waitUntil { client.authRefreshCount >= 1 }
+        sync.stopHeartbeat()
+
+        // two starts, one running task: only the immediate verify ran
+        #expect(client.authRefreshCount == 1)
     }
 
     /// poll a condition for up to ~1s so detached backfill tasks can settle

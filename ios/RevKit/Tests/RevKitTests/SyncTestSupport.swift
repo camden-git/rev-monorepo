@@ -56,6 +56,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     private(set) var listSinceArgs: [Date?] = []
     private(set) var listCellArgs: [Set<UInt64>] = []
     private(set) var listUsersCallCount = 0
+    private(set) var authRefreshCount = 0
     private(set) var profileUpdates: [(userId: String, homeH3: UInt64, color: String, displayName: String)] = []
 
     func authWithApple(authorizationCode: String, fullName: String?) async throws -> AuthResponse {
@@ -67,7 +68,8 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     }
 
     func authRefresh() async throws -> AuthResponse {
-        try onAuthRefresh()
+        lock.withLock { authRefreshCount += 1 }
+        return try onAuthRefresh()
     }
 
     func authWithInvite(displayName: String, email: String, code: String) async throws -> AuthResponse {

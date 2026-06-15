@@ -62,8 +62,13 @@ struct RootView: View {
     private func reconcileRealtime() {
         if scenePhase == .active && sync.isSignedIn {
             sync.startRealtime()
+            // catches a token revoked server-side while idle or backgrounded, which
+            // the tile/roster polls can't see (they return an empty 200 for a dead
+            // token rather than a 401)
+            sync.startHeartbeat()
         } else {
             sync.stopRealtime()
+            sync.stopHeartbeat()
         }
     }
 

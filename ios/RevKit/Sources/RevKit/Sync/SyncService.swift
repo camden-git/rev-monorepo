@@ -25,6 +25,8 @@ public final class SyncService {
     /// live tile push, nil in tests that don't exercise realtime
     private let realtime: TileRealtimeClient?
     private var realtimeActive = false
+    /// periodic session-liveness check, see `startHeartbeat`
+    private var heartbeatTask: Task<Void, Never>?
 
     /// authenticated PocketBase user id, or nil when signed out
     public private(set) var currentUserId: String?
@@ -226,6 +228,58 @@ public final class SyncService {
         realtime?.stop()
     }
 
+    // MARK: session liveness
+
+    /// confirm the stored session is still honored by the server.
+    ///
+    /// the tile-list and roster endpoints answer a revoked or expired token with
+    /// an empty `200` (their auth-only list rule simply filters every row out), so
+    /// they cannot tell a dead session apart from "no new data". `auth-refresh` is
+    /// `RequireAuth`-gated and returns `401` for a dead token, so it is the one
+    /// reliable signal that the session still works. on success it also rotates the
+    /// token, keeping the session from lapsing on its own.
+    public func verifySession() async {
+        guard currentUserId != nil else { return }
+        do {
+            let response = try await client.authRefresh()
+            // only refresh the token here; don't run the full adoptSession path so a
+            // pending local profile edit isn't clobbered by the server's copy
+            tokenStore.save(response.token)
+            lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
+        } catch {
+            // an auth failure clears the session even though this runs silently;
+            // a transient/offline error is swallowed so we don't sign the user out
+            // over a blip
+            recordSyncFailure(error, operation: "verifySession", visible: false)
+        }
+    }
+
+    /// poll session liveness while the app is foregrounded so a token revoked
+    /// server-side is caught even when the user is idle (no map pan, no drive). the
+    /// realtime stream cannot surface this: a dead token degrades to a guest
+    /// subscription that silently receives nothing.
+    public func startHeartbeat(interval: Duration = .seconds(60)) {
+        guard currentUserId != nil, heartbeatTask == nil else { return }
+        heartbeatTask = Task { [weak self] in
+            // verify straight away so a session revoked while backgrounded is caught
+            // on foreground, not one interval later
+            await self?.verifySession()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                if Task.isCancelled { return }
+                await self?.verifySession()
+            }
+        }
+    }
+
+    /// stop the liveness poll (backgrounded or signed out)
+    public func stopHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+    }
+
     /// pull the player roster into the local `Player` table
     public func syncRoster() async {
         guard currentUserId != nil else { return }
@@ -303,6 +357,7 @@ public final class SyncService {
 
     private func clearSession() {
         stopRealtime()
+        stopHeartbeat()
         tokenStore.clear()
         currentUserId = nil
     }
