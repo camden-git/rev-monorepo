@@ -65,9 +65,44 @@ public final class AppleSignInCoordinator {
             lastError = nil
             return response
         } catch {
-            lastError = String(describing: error)
+            // nil message = a silent outcome (the user cancelled), so no scary red
+            // error is shown for a normal dismissal
+            lastError = Self.userFacingMessage(for: error)
             return nil
         }
+    }
+
+    /// map a sign-in failure to a friendly message, or `nil` when the user simply
+    /// cancelled and nothing should be surfaced. never shows the raw error dump.
+    static func userFacingMessage(for error: Error) -> String? {
+        if let authError = error as? ASAuthorizationError {
+            switch authError.code {
+            case .canceled:
+                return nil
+            default:
+                return "Sign in with Apple couldn't complete. Please try again."
+            }
+        }
+        if error is AppleAuthError {
+            return "Sign in with Apple didn't return the expected credentials. Please try again."
+        }
+        if let pbError = error as? PocketBaseError {
+            switch pbError {
+            case .http, .notAuthenticated:
+                return "The server couldn't finish signing you in. Please try again."
+            case .decoding, .invalidResponse:
+                return "Got an unexpected response while signing in. Please try again."
+            }
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .timedOut, .cannotFindHost, .dnsLookupFailed:
+                return "You appear to be offline. Connect to the internet and try again."
+            default:
+                break
+            }
+        }
+        return "Couldn't complete sign in. Please try again."
     }
 
     /// Sign out: drop the stored token + session.
