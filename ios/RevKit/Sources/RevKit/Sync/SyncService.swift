@@ -386,7 +386,13 @@ public final class SyncService {
         }
         if let pocketBaseError = error as? PocketBaseError {
             switch pocketBaseError {
-            case .http(let status, _):
+            case .http(let status, let body):
+                // surface the server's own validation message for client errors
+                // (a bad invite code, an invalid email) instead of a generic
+                // "Server error 400". 401/403 were already handled above.
+                if (400..<500).contains(status), let message = Self.pocketBaseMessage(from: body) {
+                    return message
+                }
                 return "Server error \(status). Your local progress is saved."
             case .decoding:
                 return "Sync failed because the server response was unexpected."
@@ -405,6 +411,17 @@ public final class SyncService {
             }
         }
         return "Sync failed. Try again in a moment."
+    }
+
+    /// pull the human-readable `message` out of a PocketBase error envelope
+    /// (`{"message": "...", "data": {...}}`) so server-side validation errors reach
+    /// the user verbatim
+    private static func pocketBaseMessage(from body: String) -> String? {
+        guard let data = body.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let message = object["message"] as? String else { return nil }
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func errorKind(for error: Error) -> SyncErrorKind {

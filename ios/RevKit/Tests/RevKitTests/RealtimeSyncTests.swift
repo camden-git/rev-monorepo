@@ -143,6 +143,34 @@ struct RealtimeSyncTests {
         #expect(!realtime.isRunning)
     }
 
+    // MARK: invite sign-in error surfacing
+
+    @Test func inviteRejectionSurfacesServerMessage() async throws {
+        let client = MockPocketBaseClient()
+        client.onInviteAuth = { _, _, _ in
+            throw PocketBaseError.http(status: 400, body: #"{"message":"Invite code has expired.","data":{}}"#)
+        }
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+
+        await sync.signInWithInvite(displayName: "Sam", email: "s@example.com", code: "OLD")
+
+        // the user sees the actual reason, not a generic "Server error 400"
+        #expect(sync.lastError == "Invite code has expired.")
+        #expect(!sync.isSignedIn)
+    }
+
+    @Test func serverErrorWithoutBodyFallsBackToGenericMessage() async throws {
+        let client = MockPocketBaseClient()
+        client.onInviteAuth = { _, _, _ in
+            throw PocketBaseError.http(status: 500, body: "")
+        }
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+
+        await sync.signInWithInvite(displayName: "Sam", email: "s@example.com", code: "X")
+
+        #expect(sync.lastError == "Server error 500. Your local progress is saved.")
+    }
+
     // MARK: visible-tile polling
 
     @Test func visibleTilePollRetriesAfterAFailedFetch() async throws {
