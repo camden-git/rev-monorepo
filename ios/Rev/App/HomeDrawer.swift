@@ -79,7 +79,7 @@ struct HomeDrawer: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileHubView(store: store, sync: sync) { showProfile = false }
+            ProfileHubView(store: store, sync: sync, signIn: signIn) { showProfile = false }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }

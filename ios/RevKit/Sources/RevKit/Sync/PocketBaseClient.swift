@@ -39,6 +39,10 @@ public protocol PocketBaseClient: Sendable {
     /// update the signed-in user's own profile (home hex, color, display name)
     /// `PATCH /api/collections/users/records/{userId}`
     func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws
+
+    /// permanently delete the signed-in user and everything tied to them
+    /// `POST /api/rev/account/delete`
+    func deleteAccount() async throws
 }
 
 /// API connection settings

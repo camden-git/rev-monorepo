@@ -120,6 +120,11 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         _ = try await send(request, decoding: PlayerDTO.self)
     }
 
+    public func deleteAccount() async throws {
+        let request = try makeRequest(path: "/api/rev/account/delete", method: "POST", authed: true)
+        _ = try await send(request, decoding: TileClaimResponse.self) // `{ "ok": true }`
+    }
+
     // MARK: request plumbing
 
     private func makeRequest(path: String, method: String, authed: Bool, query: [URLQueryItem] = []) throws -> URLRequest {

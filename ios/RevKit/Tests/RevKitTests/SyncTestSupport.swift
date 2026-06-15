@@ -50,6 +50,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     }
     var onListUsers: @Sendable () throws -> [PlayerDTO] = { [] }
     var onUpdateProfile: @Sendable (String, UInt64, String, String) throws -> Void = { _, _, _, _ in }
+    var onDeleteAccount: @Sendable () throws -> Void = { }
 
     private(set) var createdPayloads: [DriveUploadPayload] = []
     private(set) var claimBatches: [[UInt64: Double]] = []
@@ -57,6 +58,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     private(set) var listCellArgs: [Set<UInt64>] = []
     private(set) var listUsersCallCount = 0
     private(set) var authRefreshCount = 0
+    private(set) var deleteAccountCount = 0
     private(set) var profileUpdates: [(userId: String, homeH3: UInt64, color: String, displayName: String)] = []
 
     func authWithApple(authorizationCode: String, fullName: String?) async throws -> AuthResponse {
@@ -104,6 +106,11 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws {
         lock.withLock { profileUpdates.append((userId, homeH3, color, displayName)) }
         try onUpdateProfile(userId, homeH3, color, displayName)
+    }
+
+    func deleteAccount() async throws {
+        lock.withLock { deleteAccountCount += 1 }
+        try onDeleteAccount()
     }
 }
 

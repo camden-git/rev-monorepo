@@ -327,6 +327,27 @@ public final class SyncService {
         lastDebugMessage = nil
     }
 
+    /// permanently delete the server account, then wipe every trace of it from the
+    /// device. on success the app drops to a fresh, signed-out, pre-onboarding
+    /// state. on failure the session and local data are left intact so the user can
+    /// retry. (App Store guideline 5.1.1(v).)
+    @discardableResult
+    public func deleteAccount() async -> Bool {
+        guard currentUserId != nil else { return false }
+        do {
+            try await client.deleteAccount()
+            store.wipeLocalData()
+            clearSession()
+            lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
+            return true
+        } catch {
+            recordSyncFailure(error, operation: "deleteAccount")
+            return false
+        }
+    }
+
     #if DEBUG
     /// local dev sign-in against the seeded `dev@test.driverev.app` user
     public func devSignIn(identity: String = "dev@test.driverev.app", password: String = "driverev") async {

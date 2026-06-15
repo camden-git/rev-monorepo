@@ -200,6 +200,34 @@ public final class TerritoryStore {
         saveImmediately()
     }
 
+    /// erase all on-device game state and reset to a fresh, pre-onboarding
+    /// identity. used after the server account is deleted so nothing tied to the
+    /// old account lingers locally (tiles, drives, roster, the local player id).
+    public func wipeLocalData() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = nil
+
+        for record in (try? context.fetch(FetchDescriptor<TileRecord>())) ?? [] {
+            context.delete(record)
+        }
+        for drive in (try? context.fetch(FetchDescriptor<DriveRecord>())) ?? [] {
+            context.delete(drive)
+        }
+        for player in (try? context.fetch(FetchDescriptor<Player>())) ?? [] {
+            context.delete(player)
+        }
+
+        let fresh = Player(displayName: "You", homeH3: 0, colorHex: "#3B82F6", isLocal: true)
+        context.insert(fresh)
+
+        tiles = [:]
+        tileRecords = [:]
+        players = [fresh]
+        localPlayer = fresh
+        needsOnboarding = true
+        try? context.save()
+    }
+
     private func upsert(_ cellIndex: UInt64, ownerId: String, score: Double, isHome: Bool, now: Date) {
         if let record = tileRecords[cellIndex] {
             record.ownerId = ownerId

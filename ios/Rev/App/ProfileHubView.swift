@@ -7,7 +7,14 @@ import SwiftUI
 struct ProfileHubView: View {
     let store: TerritoryStore
     let sync: SyncService
+    let signIn: AppleSignInCoordinator
     var onDone: () -> Void = {}
+
+    @State private var confirmSignOut = false
+    @State private var confirmDelete = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var showSignIn = false
 
     var body: some View {
         NavigationStack {
@@ -29,6 +36,8 @@ struct ProfileHubView: View {
                         Label("Edit Profile", systemImage: "pencil")
                     }
                 }
+
+                accountSection
 
                 #if DEBUG
                 Section("Developer") {
@@ -53,6 +62,65 @@ struct ProfileHubView: View {
                     Button("Done", action: onDone)
                 }
             }
+            .confirmationDialog("Sign out of Rev?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+                Button("Sign Out", role: .destructive) { sync.signOut() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your territory stays on this device. You can sign back in anytime.")
+            }
+            .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete Account", role: .destructive) { Task { await performDelete() } }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes your account, your claimed territory, and your drive history. This cannot be undone.")
+            }
+            .sheet(isPresented: $showSignIn) {
+                SessionRecoveryView(signIn: signIn, sync: sync) { showSignIn = false }
+                    .presentationDetents([.height(420), .medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var accountSection: some View {
+        Section("Account") {
+            if sync.isSignedIn {
+                Button { confirmSignOut = true } label: {
+                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                Button(role: .destructive) { confirmDelete = true } label: {
+                    HStack {
+                        Label("Delete Account", systemImage: "trash")
+                        if isDeleting {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isDeleting)
+                if let deleteError {
+                    Text(deleteError)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            } else {
+                Button { showSignIn = true } label: {
+                    Label("Sign In", systemImage: "person.crop.circle.badge.plus")
+                }
+            }
+        }
+    }
+
+    private func performDelete() async {
+        isDeleting = true
+        deleteError = nil
+        let deleted = await sync.deleteAccount()
+        isDeleting = false
+        if deleted {
+            onDone() // dismiss the hub; the app drops to onboarding (needsOnboarding is now true)
+        } else {
+            deleteError = sync.lastError ?? "Couldn't delete your account. Try again."
         }
     }
 

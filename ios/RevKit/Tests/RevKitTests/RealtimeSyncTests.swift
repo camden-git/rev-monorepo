@@ -143,6 +143,53 @@ struct RealtimeSyncTests {
         #expect(!realtime.isRunning)
     }
 
+    // MARK: account deletion
+
+    @Test func deleteAccountWipesLocalDataAndSignsOut() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        let sync = makeSync(store: store, client: client, realtime: MockTileRealtimeClient())
+        sync.adoptSession(AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+        store.applyRemoteTiles([makeTileDTO(SyncFixtures.cell, owner: "me", score: 10, updated: Date(timeIntervalSince1970: 1_700_000_000))])
+        #expect(!store.tiles.isEmpty)
+
+        let deleted = await sync.deleteAccount()
+
+        #expect(deleted)
+        #expect(client.deleteAccountCount == 1)
+        #expect(sync.currentUserId == nil)
+        #expect(!sync.isSignedIn)
+        #expect(store.tiles.isEmpty)
+        #expect(store.needsOnboarding)
+    }
+
+    @Test func deleteAccountKeepsEverythingOnFailure() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        client.onDeleteAccount = { throw PocketBaseError.http(status: 500, body: "boom") }
+        let sync = makeSync(store: store, client: client, realtime: MockTileRealtimeClient())
+        sync.adoptSession(AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+        store.applyRemoteTiles([makeTileDTO(SyncFixtures.cell, owner: "me", score: 10, updated: Date(timeIntervalSince1970: 1_700_000_000))])
+
+        let deleted = await sync.deleteAccount()
+
+        // a failed delete must not sign the user out or drop local data
+        #expect(!deleted)
+        #expect(sync.currentUserId == "me")
+        #expect(!store.tiles.isEmpty)
+        #expect(sync.lastError != nil)
+    }
+
+    @Test func deleteAccountSkippedWhenSignedOut() async throws {
+        let client = MockPocketBaseClient()
+        let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
+
+        let deleted = await sync.deleteAccount()
+
+        #expect(!deleted)
+        #expect(client.deleteAccountCount == 0)
+    }
+
     // MARK: invite sign-in error surfacing
 
     @Test func inviteRejectionSurfacesServerMessage() async throws {
