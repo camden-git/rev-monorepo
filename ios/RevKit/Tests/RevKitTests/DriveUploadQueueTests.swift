@@ -90,6 +90,35 @@ struct DriveUploadQueueTests {
         #expect(source.marked.isEmpty)
     }
 
+    @Test func downsampleLeavesShortPathUntouched() {
+        let path = (0..<10).map { gps(lat: Double($0)) }
+        let result = DrivePathLimit.downsample(path, maxSamples: 100)
+        #expect(result == path)
+    }
+
+    @Test func downsampleCapsLongPathKeepingEndpoints() {
+        let path = (0..<1000).map { gps(lat: Double($0)) }
+        let result = DrivePathLimit.downsample(path, maxSamples: 50)
+
+        #expect(result.count == 50)
+        // the first and last fix survive so the drive's extent and loop closure hold
+        #expect(result.first?.lat == 0)
+        #expect(result.last?.lat == 999)
+        // samples stay in order
+        #expect(result.map(\.lat) == result.map(\.lat).sorted())
+    }
+
+    @Test func downsampleHandlesDegenerateLimits() {
+        let path = (0..<5).map { gps(lat: Double($0)) }
+        // a nonsensical cap must not crash or drop to an empty path
+        #expect(DrivePathLimit.downsample(path, maxSamples: 1) == path)
+        #expect(DrivePathLimit.downsample(path, maxSamples: 0) == path)
+    }
+
+    private func gps(lat: Double) -> GPSSample {
+        GPSSample(timestamp: Date(timeIntervalSince1970: 1_000_000 + lat), lat: lat, lng: 0, speed: 10, accuracy: 5)
+    }
+
     @Test func drainStopsAtFirstFailure() async {
         let source = FakeUnsentDriveSource([SyncFixtures.payload(), SyncFixtures.payload()])
         let client = MockPocketBaseClient()

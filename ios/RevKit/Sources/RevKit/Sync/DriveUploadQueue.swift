@@ -102,6 +102,29 @@ public final class DriveUploadQueue {
     }
 }
 
+/// bounds the GPS path size of an uploaded drive
+enum DrivePathLimit {
+    /// the server caps drives.raw_path at 5 MB. cap the uploaded fix count so a
+    /// very long drive still uploads (and still resolves enclosures) instead of
+    /// being rejected outright. a few thousand fixes is plenty to reconstruct the
+    /// path, and stays well under the byte cap.
+    static let maxUploadSamples = 15_000
+
+    /// uniformly downsample a path to at most `maxSamples` fixes, preserving the
+    /// first and last fix so the drive's extent and overall shape survive
+    static func downsample(_ path: [GPSSample], maxSamples: Int = maxUploadSamples) -> [GPSSample] {
+        guard maxSamples >= 2, path.count > maxSamples else { return path }
+        var result: [GPSSample] = []
+        result.reserveCapacity(maxSamples)
+        let last = path.count - 1
+        for i in 0..<maxSamples {
+            let index = Int((Double(i) * Double(last) / Double(maxSamples - 1)).rounded())
+            result.append(path[index])
+        }
+        return result
+    }
+}
+
 /// SwiftData-backed source: reads unsent `DriveRecord`s and maps them to upload
 /// payloads, then flips `uploaded` once the server accepts them. the backend
 /// assigns the drive owner from the auth token
@@ -125,7 +148,7 @@ public final class SwiftDataDriveSource: UnsentDriveSource {
                 payload: DriveUploadPayload(
                     startedAt: record.startedAt,
                     endedAt: record.endedAt,
-                    rawPath: record.rawPath,
+                    rawPath: DrivePathLimit.downsample(record.rawPath),
                     perTileScores: record.perTileScores
                 )
             )
