@@ -1,5 +1,8 @@
 import Foundation
 import SwiftData
+#if canImport(os)
+import os
+#endif
 
 /// one drive awaiting upload
 public struct PendingDrive: Sendable, Equatable {
@@ -34,26 +37,68 @@ public protocol UnsentDriveSource: AnyObject {
 public final class DriveUploadQueue {
     private let client: PocketBaseClient
     private let source: UnsentDriveSource
+    #if canImport(os)
+    private let logger = Logger(subsystem: "app.driverev.RevKit", category: "DriveUploadQueue")
+    #endif
 
     public init(client: PocketBaseClient, source: UnsentDriveSource) {
         self.client = client
         self.source = source
     }
 
-    /// upload every pending drive
+    /// upload every pending drive.
+    ///
+    /// drives upload oldest-first, so a single drive the server will never accept
+    /// (a malformed or otherwise permanently-rejected payload) would otherwise sit
+    /// at the head of the queue and block every later drive on every drain. such a
+    /// drive is dropped (flagged uploaded so it isn't retried) and the drain
+    /// continues. the local tile state was already applied optimistically, so
+    /// nothing the player can see is lost. a transient failure (offline, 5xx, rate
+    /// limit) or an auth failure still stops the drain so the caller can retry or
+    /// prompt re-auth.
     @discardableResult
-    public func drain() async -> (uploaded: Int, failed: Bool, error: Error?) {
+    public func drain() async -> (uploaded: Int, dropped: Int, failed: Bool, error: Error?) {
         var uploaded = 0
+        var dropped = 0
         for pending in source.unsent() {
             do {
                 _ = try await client.createDrive(pending.payload)
                 source.markUploaded(pending.id)
                 uploaded += 1
             } catch {
-                return (uploaded, true, error)
+                if isPermanentRejection(error) {
+                    source.markUploaded(pending.id)
+                    dropped += 1
+                    logDrop(pending.id, error: error)
+                    continue
+                }
+                return (uploaded, dropped, true, error)
             }
         }
-        return (uploaded, false, nil)
+        return (uploaded, dropped, false, nil)
+    }
+
+    /// a 4xx the server will return again for the same payload, so retrying is
+    /// pointless. 401/403 (auth) and 408/429 (timeout / rate limit) are excluded:
+    /// those are recoverable and must stop the drain rather than drop the drive.
+    private func isPermanentRejection(_ error: Error) -> Bool {
+        guard case let PocketBaseError.http(status, _) = error else { return false }
+        switch status {
+        case 401, 403, 408, 429:
+            return false
+        case 400..<500:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func logDrop(_ id: UUID, error: Error) {
+        #if canImport(os)
+        logger.error("dropping permanently-rejected drive \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+        #else
+        print("DriveUploadQueue dropping permanently-rejected drive \(id): \(error)")
+        #endif
     }
 }
 
