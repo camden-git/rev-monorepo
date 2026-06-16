@@ -64,13 +64,13 @@ public struct PocketBaseConfig: Sendable {
     /// local PocketBase for simulator development
     /// this works because the iOS simulator shares the host network
     public static let localSimulator = PocketBaseConfig(
-        baseURL: URL(string: "http://localhost:8090")!,
-        appleRedirectURL: "http://localhost:8090/api/oauth2-redirect"
+        baseURL: URL(string: "https://driverev.app")!,
+        appleRedirectURL: "https://driverev.app/api/oauth2-redirect"
     )
 
     /// local PocketBase for physical-device development over my LAN lol
     public static let phoneDevelopment = PocketBaseConfig(
-        baseURL: URL(string: "http://192.168.0.159:8090")!,
-        appleRedirectURL: "http://192.168.0.159:8090/api/oauth2-redirect"
+        baseURL: URL(string: "https://driverev.app")!,
+        appleRedirectURL: "https://driverev.app/api/oauth2-redirect"
     )
 }

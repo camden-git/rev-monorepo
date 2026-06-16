@@ -45,6 +45,9 @@ public final class TerritoryStore {
             tiles[cellId] = ClaimResolver.TileState(
                 ownerId: record.ownerId,
                 claimScore: record.claimScore,
+                refSpeed: record.refSpeed,
+                obsCount: record.obsCount,
+                captures: record.captures,
                 lastDrivenAt: record.lastDrivenAt,
                 isHome: record.isHome
             )
@@ -84,7 +87,91 @@ public final class TerritoryStore {
             // re-drive floor
             upsert(cellIndex, ownerId: claimant, score: newScore, isHome: current?.isHome ?? false, now: now)
         case let .captured(newScore):
-            upsert(cellIndex, ownerId: claimant, score: newScore, isHome: false, now: now)
+            upsert(
+                cellIndex,
+                ownerId: claimant,
+                score: newScore,
+                refSpeed: current?.refSpeed ?? Strength.referenceSpeedPrior,
+                obsCount: current?.obsCount ?? 0,
+                captures: (current?.captures ?? 0) + 1,
+                isHome: false,
+                now: now
+            )
+        }
+        return outcome
+    }
+
+    /// Resolve a raw in-tile speed observation through Score Metric v2. The
+    /// server stays authoritative, but this mirrors the conversion so live HUD
+    /// and provisional local state use the same units as synced tiles.
+    @discardableResult
+    public func claimSpeed(
+        _ cellIndex: UInt64,
+        speedMph: Double,
+        by ownerId: String? = nil,
+        now: Date = .now
+    ) -> ClaimResolver.ClaimOutcome {
+        let claimant = ownerId ?? localPlayer.id
+        let current = tiles[cellIndex]
+        let currentRef = current?.refSpeed ?? Strength.referenceSpeedPrior
+        let strength = Strength.strength(speedMph: speedMph, refSpeed: currentRef)
+        let nextRef = Strength.updateReference(refSpeed: currentRef, speedMph: speedMph)
+        let nextObs = (current?.obsCount ?? 0) + 1
+
+        let outcome = ClaimResolver.resolve(
+            current: current,
+            claimantId: claimant,
+            incomingScore: strength,
+            now: now
+        )
+
+        switch outcome {
+        case .noChange:
+            if let current {
+                upsert(
+                    cellIndex,
+                    ownerId: current.ownerId,
+                    score: current.claimScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: current.captures,
+                    isHome: current.isHome,
+                    now: current.lastDrivenAt
+                )
+            }
+        case let .created(newScore):
+            upsert(
+                cellIndex,
+                ownerId: claimant,
+                score: newScore,
+                refSpeed: nextRef,
+                obsCount: nextObs,
+                captures: 0,
+                isHome: false,
+                now: now
+            )
+        case let .reinforced(newScore):
+            upsert(
+                cellIndex,
+                ownerId: claimant,
+                score: newScore,
+                refSpeed: nextRef,
+                obsCount: nextObs,
+                captures: current?.captures ?? 0,
+                isHome: current?.isHome ?? false,
+                now: now
+            )
+        case let .captured(newScore):
+            upsert(
+                cellIndex,
+                ownerId: claimant,
+                score: newScore,
+                refSpeed: nextRef,
+                obsCount: nextObs,
+                captures: (current?.captures ?? 0) + 1,
+                isHome: false,
+                now: now
+            )
         }
         return outcome
     }
@@ -102,7 +189,16 @@ public final class TerritoryStore {
     /// `applyRemotePlayers` has seeded their `Player` rows
     public func applyRemoteTiles(_ tiles: [TileDTO]) {
         for dto in tiles {
-            upsert(dto.h3, ownerId: dto.owner, score: dto.claimScore, isHome: dto.isHome, now: dto.lastDrivenAt)
+            upsert(
+                dto.h3,
+                ownerId: dto.owner,
+                score: dto.claimScore,
+                refSpeed: dto.refSpeed,
+                obsCount: dto.obsCount,
+                captures: dto.captures,
+                isHome: dto.isHome,
+                now: dto.lastDrivenAt
+            )
         }
     }
 
@@ -133,6 +229,9 @@ public final class TerritoryStore {
             tiles[cell] = ClaimResolver.TileState(
                 ownerId: serverId,
                 claimScore: state.claimScore,
+                refSpeed: state.refSpeed,
+                obsCount: state.obsCount,
+                captures: state.captures,
                 lastDrivenAt: state.lastDrivenAt,
                 isHome: state.isHome
             )
@@ -195,7 +294,16 @@ public final class TerritoryStore {
     /// FUTURE (server-side)
     public func establishHome(at cell: UInt64, now: Date = .now) {
         localPlayer.homeH3 = Int64(h3: cell)
-        upsert(cell, ownerId: localPlayer.id, score: 0, isHome: true, now: now)
+        upsert(
+            cell,
+            ownerId: localPlayer.id,
+            score: 0,
+            refSpeed: Strength.referenceSpeedPrior,
+            obsCount: 0,
+            captures: 0,
+            isHome: true,
+            now: now
+        )
         needsOnboarding = false
         saveImmediately()
     }
@@ -229,9 +337,35 @@ public final class TerritoryStore {
     }
 
     private func upsert(_ cellIndex: UInt64, ownerId: String, score: Double, isHome: Bool, now: Date) {
+        let current = tiles[cellIndex]
+        upsert(
+            cellIndex,
+            ownerId: ownerId,
+            score: score,
+            refSpeed: current?.refSpeed ?? Strength.referenceSpeedPrior,
+            obsCount: current?.obsCount ?? 0,
+            captures: current?.captures ?? 0,
+            isHome: isHome,
+            now: now
+        )
+    }
+
+    private func upsert(
+        _ cellIndex: UInt64,
+        ownerId: String,
+        score: Double,
+        refSpeed: Double,
+        obsCount: Int,
+        captures: Int,
+        isHome: Bool,
+        now: Date
+    ) {
         if let record = tileRecords[cellIndex] {
             record.ownerId = ownerId
             record.claimScore = score
+            record.refSpeed = refSpeed
+            record.obsCount = obsCount
+            record.captures = captures
             record.lastDrivenAt = now
             record.isHome = isHome
         } else {
@@ -239,6 +373,9 @@ public final class TerritoryStore {
                 h3: cellIndex,
                 ownerId: ownerId,
                 claimScore: score,
+                refSpeed: refSpeed,
+                obsCount: obsCount,
+                captures: captures,
                 lastDrivenAt: now,
                 isHome: isHome
             )
@@ -248,6 +385,9 @@ public final class TerritoryStore {
         tiles[cellIndex] = ClaimResolver.TileState(
             ownerId: ownerId,
             claimScore: score,
+            refSpeed: refSpeed,
+            obsCount: obsCount,
+            captures: captures,
             lastDrivenAt: now,
             isHome: isHome
         )
@@ -310,6 +450,7 @@ public final class TerritoryStore {
         public let colorHex: String
         public let isLocal: Bool
         public let tilesHeld: Int
+        public let empireScore: Double
         public var id: String { playerId }
     }
 
@@ -317,8 +458,10 @@ public final class TerritoryStore {
     /// players with no tiles still appear
     public func leaderboard() -> [LeaderboardEntry] {
         var counts: [String: Int] = [:]
+        var scores: [String: Double] = [:]
         for state in tiles.values {
             counts[state.ownerId, default: 0] += 1
+            scores[state.ownerId, default: 0] += state.isHome ? 1 : Strength.tileValue(captures: state.captures)
         }
         return players
             .map { player in
@@ -327,12 +470,13 @@ public final class TerritoryStore {
                     displayName: player.displayName,
                     colorHex: player.colorHex,
                     isLocal: player.isLocal,
-                    tilesHeld: counts[player.id] ?? 0
+                    tilesHeld: counts[player.id] ?? 0,
+                    empireScore: scores[player.id] ?? 0
                 )
             }
             .sorted {
-                $0.tilesHeld != $1.tilesHeld
-                    ? $0.tilesHeld > $1.tilesHeld
+                $0.empireScore != $1.empireScore
+                    ? $0.empireScore > $1.empireScore
                     : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
             }
     }

@@ -44,7 +44,10 @@ func up(app core.App) error {
 		// res-8 parent used for compact viewport queries
 		&core.TextField{Name: "h3_r8", Max: 20},
 		&core.RelationField{Name: "owner", CollectionId: users.Id, MaxSelect: 1, CascadeDelete: false},
-		&core.NumberField{Name: "claim_score"}, // distance-weighted avg speed (mph)
+		&core.NumberField{Name: "claim_score"}, // v2 claim strength, normalized from raw mph
+		&core.NumberField{Name: "ref_speed"},   // EWMA raw mph reference for this tile
+		&core.NumberField{Name: "obs_count"},   // number of speed observations folded into ref_speed
+		&core.NumberField{Name: "captures"},    // lifetime ownership changes, used for tile value
 		&core.DateField{Name: "last_driven_at"},
 		&core.BoolField{Name: "is_home"},
 		&core.AutodateField{Name: "created", OnCreate: true},

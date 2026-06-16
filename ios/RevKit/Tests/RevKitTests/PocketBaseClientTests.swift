@@ -45,7 +45,7 @@ struct PocketBaseClientTests {
         let cell = SyncFixtures.cell
         let listJSON = """
         {"page":1,"perPage":500,"totalItems":1,"totalPages":1,"items":[
-          {"id":"t1","h3":"\(cell)","owner":"u2","claim_score":40.5,"last_driven_at":"2026-06-01 09:00:00.000Z","is_home":false,"updated":"2026-06-02 09:00:00.000Z"}
+          {"id":"t1","h3":"\(cell)","owner":"u2","claim_score":1.8,"ref_speed":22.5,"obs_count":4,"captures":2,"last_driven_at":"2026-06-01 09:00:00.000Z","is_home":false,"updated":"2026-06-02 09:00:00.000Z"}
         ]}
         """
         let transport = MockHTTPTransport { _ in (Data(listJSON.utf8), httpResponse(200)) }
@@ -56,7 +56,10 @@ struct PocketBaseClientTests {
         let tile = try #require(tiles.first)
         #expect(tile.h3 == cell) // string -> uint64, no precision loss
         #expect(tile.owner == "u2")
-        #expect(tile.claimScore == 40.5)
+        #expect(tile.claimScore == 1.8)
+        #expect(tile.refSpeed == 22.5)
+        #expect(tile.obsCount == 4)
+        #expect(tile.captures == 2)
         #expect(tile.isHome == false)
 
         let url = try #require(transport.requests.first?.url?.absoluteString)
@@ -79,7 +82,7 @@ struct PocketBaseClientTests {
         let cell = SyncFixtures.cell
         let listJSON = """
         {"items":[
-          {"id":"t1","h3":"\(cell)","owner":"u2","claim_score":40.5,"last_driven_at":"2026-06-01 09:00:00.000Z","is_home":false,"updated":"2026-06-02 09:00:00.000Z"}
+          {"id":"t1","h3":"\(cell)","owner":"u2","claim_score":1.8,"ref_speed":22.5,"obs_count":4,"captures":2,"last_driven_at":"2026-06-01 09:00:00.000Z","is_home":false,"updated":"2026-06-02 09:00:00.000Z"}
         ]}
         """
         let transport = MockHTTPTransport { _ in (Data(listJSON.utf8), httpResponse(200)) }
@@ -88,6 +91,8 @@ struct PocketBaseClientTests {
         let tiles = try await client.listTiles(h3Cells: [cell, cell &+ 1])
 
         #expect(tiles.map(\.h3) == [cell])
+        #expect(tiles.first?.refSpeed == 22.5)
+        #expect(tiles.first?.captures == 2)
         #expect(transport.requests.count == 1)
         let req = try #require(transport.requests.first)
         #expect(req.httpMethod == "POST")

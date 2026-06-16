@@ -8,7 +8,7 @@ import SwiftyH3
 ///
 /// score(tile) = Σ distance moved inside the tile / Σ time spent moving inside the tile, where "moving"
 ///
-/// Returned in **mph** to match `tiles.claim_score`
+/// Returned in **mph**; Score Metric v2 converts this raw speed into claim strength.
 public enum TileScoring {
     /// 1 m/s expressed in mph
     static let mphPerMetersPerSecond = 2.2369362920544

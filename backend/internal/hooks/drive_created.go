@@ -69,22 +69,24 @@ func resolveDrive(app core.App, drive *core.Record) error {
 	return app.RunInTransaction(func(txApp core.App) error {
 		// 1: per-tile direct resolution
 		claimedThisDrive := map[uint64]bool{}
+		strengths := map[string]float64{}
 		for h3str, score := range perTile {
 			h3, err := strconv.ParseUint(h3str, 10, 64)
 			if err != nil {
 				continue // skip malformed keys rather than fail the whole drive
 			}
-			changed, err := resolveTile(txApp, h3, userID, score, now)
+			changed, strength, err := resolveTile(txApp, h3, userID, score, now)
 			if err != nil {
 				return err
 			}
+			strengths[h3str] = strength
 			if changed {
 				claimedThisDrive[h3] = true
 			}
 		}
 
 		// 2: enclosure flood-fill
-		if err := resolveEnclosure(txApp, drive, userID, rawPath, perTile, claimedThisDrive, now); err != nil {
+		if err := resolveEnclosure(txApp, drive, userID, rawPath, strengths, claimedThisDrive, now); err != nil {
 			return err
 		}
 
@@ -108,7 +110,7 @@ func ResolveDirectClaims(app core.App, userID string, perTile map[string]float64
 			if err != nil {
 				continue // skip malformed keys rather than fail the whole batch
 			}
-			if _, err := resolveTile(txApp, h3, userID, score, now); err != nil {
+			if _, _, err := resolveTile(txApp, h3, userID, score, now); err != nil {
 				return err
 			}
 		}
@@ -116,13 +118,20 @@ func ResolveDirectClaims(app core.App, userID string, perTile map[string]float64
 	})
 }
 
-// resolveTile applies one direct claim and reports whether the tile changed
-func resolveTile(txApp core.App, h3 uint64, userID string, score float64, now time.Time) (bool, error) {
+// resolveTile applies one direct raw-mph observation and reports whether the
+// ownership state changed plus the normalized claim strength used for comparison.
+func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now time.Time) (bool, float64, error) {
 	h3str := strconv.FormatUint(h3, 10)
 	existing := findTile(txApp, h3str)
 
+	refSpeed := game.ReferenceSpeedPrior
+	obsCount := 0
 	var current *game.TileState
 	if existing != nil {
+		if storedRef := existing.GetFloat("ref_speed"); storedRef > 0 {
+			refSpeed = storedRef
+		}
+		obsCount = existing.GetInt("obs_count")
 		current = &game.TileState{
 			OwnerID:      existing.GetString("owner"),
 			ClaimScore:   existing.GetFloat("claim_score"),
@@ -131,41 +140,55 @@ func resolveTile(txApp core.App, h3 uint64, userID string, score float64, now ti
 		}
 	}
 
-	outcome := game.Resolve(current, userID, score, now)
+	strength := game.Strength(speedMph, refSpeed)
+	nextRef := game.UpdateReference(refSpeed, speedMph)
+	nextObs := obsCount + 1
+
+	outcome := game.Resolve(current, userID, strength, now)
 	switch outcome.Kind {
 	case game.NoChange:
-		return false, nil
+		if existing != nil {
+			setTileReference(existing, nextRef, nextObs)
+			if err := txApp.Save(existing); err != nil {
+				return false, strength, err
+			}
+		}
+		return false, strength, nil
 
 	case game.Created:
-		if err := createTile(txApp, h3str, userID, outcome.Score, false, now); err != nil {
-			return false, err
+		if err := createTile(txApp, h3str, userID, outcome.Score, false, nextRef, nextObs, 0, now); err != nil {
+			return false, strength, err
 		}
-		return true, nil
+		return true, strength, nil
 
 	case game.Reinforced:
 		setTileWindowParent(existing, h3)
+		setTileReference(existing, nextRef, nextObs)
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
-			return false, err
+			return false, strength, err
 		}
-		return true, nil
+		return true, strength, nil
 
 	case game.Captured:
+		captures := existing.GetInt("captures") + 1
 		setTileWindowParent(existing, h3)
+		setTileReference(existing, nextRef, nextObs)
 		existing.Set("owner", userID)
 		existing.Set("claim_score", outcome.Score)
+		existing.Set("captures", captures)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
-			return false, err
+			return false, strength, err
 		}
 		// append tile_history on ownership change
 		if err := appendHistory(txApp, h3str, userID, outcome.Score, now); err != nil {
-			return false, err
+			return false, strength, err
 		}
-		return true, nil
+		return true, strength, nil
 	}
-	return false, nil
+	return false, strength, nil
 }
 
 // resolveEnclosure detects the loop the drive closed and claims its interior
@@ -179,7 +202,7 @@ func resolveEnclosure(
 	drive *core.Record,
 	userID string,
 	rawPath []gpsSample,
-	perTile map[string]float64,
+	perTileStrengths map[string]float64,
 	claimedThisDrive map[uint64]bool,
 	now time.Time,
 ) error {
@@ -209,7 +232,7 @@ func resolveEnclosure(
 		owned[h3] = true
 	}
 
-	opt := game.DefaultEncloseOptions(meanScore(perTile))
+	opt := game.DefaultEncloseOptions(meanScore(perTileStrengths))
 	opt.Owned = owned
 	result := game.Enclose(trail, opt)
 
@@ -218,11 +241,60 @@ func resolveEnclosure(
 		if score <= 0 || h3 == homeCell {
 			continue
 		}
-		if _, err := resolveTile(txApp, h3, userID, score, now); err != nil {
+		if _, _, err := resolveStrengthTile(txApp, h3, userID, score, now); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength float64, now time.Time) (bool, float64, error) {
+	h3str := strconv.FormatUint(h3, 10)
+	existing := findTile(txApp, h3str)
+
+	var current *game.TileState
+	if existing != nil {
+		current = &game.TileState{
+			OwnerID:      existing.GetString("owner"),
+			ClaimScore:   existing.GetFloat("claim_score"),
+			LastDrivenAt: existing.GetDateTime("last_driven_at").Time(),
+			IsHome:       existing.GetBool("is_home"),
+		}
+	}
+
+	outcome := game.Resolve(current, userID, strength, now)
+	switch outcome.Kind {
+	case game.NoChange:
+		return false, strength, nil
+	case game.Created:
+		if err := createTile(txApp, h3str, userID, outcome.Score, false, game.ReferenceSpeedPrior, 0, 0, now); err != nil {
+			return false, strength, err
+		}
+		return true, strength, nil
+	case game.Reinforced:
+		setTileWindowParent(existing, h3)
+		existing.Set("claim_score", outcome.Score)
+		existing.Set("last_driven_at", now)
+		if err := txApp.Save(existing); err != nil {
+			return false, strength, err
+		}
+		return true, strength, nil
+	case game.Captured:
+		captures := existing.GetInt("captures") + 1
+		setTileWindowParent(existing, h3)
+		existing.Set("owner", userID)
+		existing.Set("claim_score", outcome.Score)
+		existing.Set("captures", captures)
+		existing.Set("last_driven_at", now)
+		if err := txApp.Save(existing); err != nil {
+			return false, strength, err
+		}
+		if err := appendHistory(txApp, h3str, userID, outcome.Score, now); err != nil {
+			return false, strength, err
+		}
+		return true, strength, nil
+	}
+	return false, strength, nil
 }
 
 // MARK: helpers
@@ -235,7 +307,7 @@ func findTile(txApp core.App, h3str string) *core.Record {
 	return rec
 }
 
-func createTile(txApp core.App, h3str, userID string, score float64, isHome bool, now time.Time) error {
+func createTile(txApp core.App, h3str, userID string, score float64, isHome bool, refSpeed float64, obsCount int, captures int, now time.Time) error {
 	col, err := txApp.FindCollectionByNameOrId("tiles")
 	if err != nil {
 		return err
@@ -247,9 +319,17 @@ func createTile(txApp core.App, h3str, userID string, score float64, isHome bool
 	}
 	rec.Set("owner", userID)
 	rec.Set("claim_score", score)
+	rec.Set("ref_speed", refSpeed)
+	rec.Set("obs_count", obsCount)
+	rec.Set("captures", captures)
 	rec.Set("last_driven_at", now)
 	rec.Set("is_home", isHome)
 	return txApp.Save(rec)
+}
+
+func setTileReference(rec *core.Record, refSpeed float64, obsCount int) {
+	rec.Set("ref_speed", refSpeed)
+	rec.Set("obs_count", obsCount)
 }
 
 func setTileWindowParent(rec *core.Record, h3 uint64) {

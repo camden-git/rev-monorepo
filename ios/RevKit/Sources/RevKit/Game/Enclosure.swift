@@ -20,7 +20,7 @@ public enum Enclosure {
     /// - trail: ordered, de-duped cells the drive crossed (`TileScoring.tilesCrossed`)
     /// - owned: the driver's currently-owned cells, they act as wall so leaving and returning to your
     ///   own territory closes a loop without any perimeter-walking code
-    /// - loopScore: representative drive score (mph) used as the boundary value of the gradient
+    /// - loopScore: representative claim strength used as the boundary value of the gradient
     /// - minArea: minimum enclosed hexes to count (docs §Guardrails: >=3)
     /// - maxRadius / maxInterior: enormous-fill guards
     public static func enclose(

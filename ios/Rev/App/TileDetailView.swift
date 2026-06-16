@@ -15,8 +15,8 @@ struct TileDetailView: View {
                     homeNote
                     metadata
                 } else if detail.isClaimed {
-                    if let speed = detail.effectiveScore {
-                        speedBlock(speed)
+                    if let strength = detail.effectiveScore {
+                        strengthBlock(strength)
                     }
                     metadata
                 } else {
@@ -92,19 +92,19 @@ struct TileDetailView: View {
         return detail.isLocalOwner ? "Your territory" : "Rival territory"
     }
 
-    // MARK: speed
+    // MARK: strength
 
-    private func speedBlock(_ speed: Double) -> some View {
+    private func strengthBlock(_ strength: Double) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(Int(speed.rounded()))")
+                Text(String(format: "%.1f", strength))
                     .font(.system(size: 44, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                Text("mph")
+                Text("strength")
                     .font(.title3.weight(.medium))
                     .foregroundStyle(.secondary)
             }
-            Text(speedCaption)
+            Text(strengthCaption)
                 .font(.footnote)
                 .foregroundStyle(isFading ? Color.orange : .secondary)
         }
@@ -120,15 +120,15 @@ struct TileDetailView: View {
         return claim - effective >= 1
     }
 
-    /// caption under the speed
-    private var speedCaption: String {
-        let fadingFrom = detail.claimScore.map { "Fading from \(Int($0.rounded())) mph" }
+    /// caption under the strength
+    private var strengthCaption: String {
+        let fadingFrom = detail.claimScore.map { String(format: "Fading from %.1f", $0) }
         if detail.isLocalOwner {
             if let fadingFrom, isFading { return "\(fadingFrom), drive it to refresh" }
             return "Holding strong"
         } else {
             if let fadingFrom, isFading { return "\(fadingFrom), easier to take" }
-            return "Beat this speed to take it"
+            return "Beat this strength to take it"
         }
     }
 

@@ -149,6 +149,6 @@ struct ProfileHubView: View {
     private var standing: String? {
         let board = store.leaderboard()
         guard let index = board.firstIndex(where: { $0.isLocal }) else { return nil }
-        return "Rank #\(index + 1) · \(board[index].tilesHeld) tiles"
+        return String(format: "Rank #%d · %.1f score", index + 1, board[index].empireScore)
     }
 }

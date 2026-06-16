@@ -9,8 +9,14 @@ public final class TileRecord {
     /// H3 cell id stored as Int64 bit-pattern
     @Attribute(.unique) public var h3: Int64
     public var ownerId: String
-    /// distance-weighted average speed (mph) at claim time
+    /// Score Metric v2 claim strength at claim time
     public var claimScore: Double
+    /// EWMA raw mph reference speed for this tile
+    public var refSpeed: Double
+    /// number of raw speed observations folded into `refSpeed`
+    public var obsCount: Int
+    /// lifetime ownership changes, used for tile value
+    public var captures: Int
     public var lastDrivenAt: Date
     public var isHome: Bool
 
@@ -18,12 +24,18 @@ public final class TileRecord {
         h3: UInt64,
         ownerId: String,
         claimScore: Double,
+        refSpeed: Double = Strength.referenceSpeedPrior,
+        obsCount: Int = 0,
+        captures: Int = 0,
         lastDrivenAt: Date,
         isHome: Bool
     ) {
         self.h3 = Int64(h3: h3)
         self.ownerId = ownerId
         self.claimScore = claimScore
+        self.refSpeed = refSpeed
+        self.obsCount = obsCount
+        self.captures = captures
         self.lastDrivenAt = lastDrivenAt
         self.isHome = isHome
     }

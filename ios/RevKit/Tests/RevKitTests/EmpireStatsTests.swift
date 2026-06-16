@@ -11,11 +11,13 @@ struct EmpireStatsTests {
         owner: String,
         score: Double,
         daysAgo: Double,
-        isHome: Bool = false
+        isHome: Bool = false,
+        captures: Int = 0
     ) -> ClaimResolver.TileState {
         ClaimResolver.TileState(
             ownerId: owner,
             claimScore: score,
+            captures: captures,
             lastDrivenAt: now.addingTimeInterval(-daysAgo * 24 * 60 * 60),
             isHome: isHome
         )
@@ -43,6 +45,7 @@ struct EmpireStatsTests {
     @Test func emptyWorldIsZeroed() {
         let s = compute([])
         #expect(s.tilesHeld == 0)
+        #expect(s.empireScore == 0)
         #expect(s.tilesAtRisk == 0)
         #expect(s.strongholdScore == 0)
         #expect(s.totalDrives == 0)
@@ -58,6 +61,17 @@ struct EmpireStatsTests {
             tile(owner: "rival", score: 50, daysAgo: 0),
         ])
         #expect(s.tilesHeld == 2)
+    }
+
+    /// empire score weights non-home tiles by their contestedness value
+    @Test func empireScoreWeightsCapturedTiles() {
+        let s = compute([
+            tile(owner: me, score: 0, daysAgo: 0, isHome: true),
+            tile(owner: me, score: 1.5, daysAgo: 0, captures: 3),
+            tile(owner: me, score: 1.0, daysAgo: 0),
+        ])
+        let expected = 1 + Strength.tileValue(captures: 3) + 1
+        #expect(abs(s.empireScore - expected) < 1e-9)
     }
 
     /// a tile driven recently is not at-risk but one untouched for 2 weeks is
@@ -95,7 +109,7 @@ struct EmpireStatsTests {
         #expect(s.tilesAtRisk == 1) // only the ordinary tile
     }
 
-    /// stronghold score is the max claim score among held tiles
+    /// stronghold score is the max claim strength among held tiles
     @Test func strongholdScoreIsMaxHeld() {
         let s = compute([
             tile(owner: me, score: 22, daysAgo: 0),

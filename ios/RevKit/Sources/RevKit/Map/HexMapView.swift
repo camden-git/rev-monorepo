@@ -136,29 +136,28 @@ public struct HexMapView: UIViewRepresentable {
             self.onSelectTile = onSelectTile
         }
 
-        // MARK: speed to fill intensity
+        // MARK: strength to fill intensity
 
-        /// fill alpha scales with a tile's score, which is just its speed in mph the scale's top is the
-        /// fastest tile anywhere in the store
+        /// fill alpha scales with a tile's effective claim strength.
         private static let minFillAlpha: CGFloat = 0.12
         private static let maxFillAlpha: CGFloat = 0.55
-        /// floor for the scale's top, so a garage full of slow tiles doesn't amplify GPS noise
+        /// floor for the scale's top, so weak tiles don't amplify noise
         /// into a full-contrast map
-        private static let minSpeedScaleMph = 15.0
+        private static let minStrengthScale = 1.0
         /// quantizing the scale into bands means decay only rebuilds the overlay when a tile
         /// actually crosses a band
         private static let fillBandCount = 6
 
-        private func speedScaleCeil(now: Date) -> Double {
-            var ceil = Self.minSpeedScaleMph
+        private func strengthScaleCeil(now: Date) -> Double {
+            var ceil = Self.minStrengthScale
             for cell in store.tiles.keys {
                 if let s = store.effectiveScore(of: cell, now: now), s > ceil { ceil = s }
             }
             return ceil
         }
 
-        private static func fillBand(forSpeed mph: Double, ceil: Double) -> Int {
-            let t = ceil <= 0 ? 0 : min(max(mph / ceil, 0), 1)
+        private static func fillBand(forStrength strength: Double, ceil: Double) -> Int {
+            let t = ceil <= 0 ? 0 : min(max(strength / ceil, 0), 1)
             return Int((t * Double(fillBandCount - 1)).rounded())
         }
 
@@ -189,7 +188,7 @@ public struct HexMapView: UIViewRepresentable {
             claimedOverlaySignature = signature
 
             // remove and rebuild the visible slice of each player's overlay, split into one
-            // overlay per speed band so fill intensity can vary across a player's territory
+            // overlay per strength band so fill intensity can vary across a player's territory
             for overlay in claimFillOverlays { mapView.removeOverlay(overlay) }
             for overlay in claimOutlineOverlays { mapView.removeOverlay(overlay) }
             claimFillOverlays.removeAll()
@@ -197,15 +196,15 @@ public struct HexMapView: UIViewRepresentable {
             claimOutlineOverlays.removeAll()
             claimOutlineColors.removeAll()
             let cellsByOwner = visibleClaimCellsByOwner()
-            let ceil = speedScaleCeil(now: .now)
+            let ceil = strengthScaleCeil(now: .now)
             for player in store.players {
                 guard let cells = cellsByOwner[player.id], !cells.isEmpty,
                       let color = UIColor(hex: player.colorHex) else { continue }
 
                 var cellsByBand: [Int: Set<UInt64>] = [:]
                 for cell in cells {
-                    let speed = store.effectiveScore(of: cell) ?? 0
-                    cellsByBand[Self.fillBand(forSpeed: speed, ceil: ceil), default: []].insert(cell)
+                    let strength = store.effectiveScore(of: cell) ?? 0
+                    cellsByBand[Self.fillBand(forStrength: strength, ceil: ceil), default: []].insert(cell)
                 }
 
                 // stroke-less band fills first
@@ -237,10 +236,10 @@ public struct HexMapView: UIViewRepresentable {
         private func makeClaimedOverlaySignature(for mapView: MKMapView) -> ClaimedOverlaySignature {
             var visibleOwners: [UInt64: String] = [:]
             visibleOwners.reserveCapacity(Swift.min(visibleClaimCells.count, store.tiles.count))
-            let ceil = speedScaleCeil(now: .now)
+            let ceil = strengthScaleCeil(now: .now)
             for cell in visibleClaimCells {
                 if let ownerId = store.tiles[cell]?.ownerId {
-                    let band = Self.fillBand(forSpeed: store.effectiveScore(of: cell) ?? 0, ceil: ceil)
+                    let band = Self.fillBand(forStrength: store.effectiveScore(of: cell) ?? 0, ceil: ceil)
                     visibleOwners[cell] = "\(ownerId)#\(band)"
                 }
             }

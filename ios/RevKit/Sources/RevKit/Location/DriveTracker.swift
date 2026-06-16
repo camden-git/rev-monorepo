@@ -240,22 +240,22 @@ public final class DriveTracker {
         let now = locations.last?.timestamp ?? Date()
         if now.timeIntervalSince(lastLiveRescore) >= liveRescoreInterval {
             lastLiveRescore = now
-            applyPerTileScores()
-            flushLiveClaims()
+            let scores = applyPerTileScores()
+            flushLiveClaims(rawScores: scores)
         }
     }
 
     /// stream the tiles the local player now holds (direct and enclosed) that are new
-    /// or materially re-scored since the last flush
-    private func flushLiveClaims() {
+    /// or materially re-scored since the last flush. The server expects raw mph
+    /// and performs the authoritative v2 strength conversion.
+    private func flushLiveClaims(rawScores: [UInt64: Double]) {
         guard let onLiveClaims else { return }
         let me = store.localPlayer.id
         var delta: [UInt64: Double] = [:]
-        for cell in beforeOwners.keys {
+        for (cell, rawScore) in rawScores {
             guard store.tiles[cell]?.ownerId == me else { continue }
-            let score = store.tiles[cell]?.claimScore ?? 0
-            if let prev = liveFlushedScores[cell], abs(prev - score) < liveFlushScoreEpsilon { continue }
-            delta[cell] = score
+            if let prev = liveFlushedScores[cell], abs(prev - rawScore) < liveFlushScoreEpsilon { continue }
+            delta[cell] = rawScore
         }
         guard !delta.isEmpty else { return }
         for (cell, score) in delta { liveFlushedScores[cell] = score }
@@ -273,7 +273,7 @@ public final class DriveTracker {
         let scores = TileScoring.perTileScores(for: cleanedPath)
         for (tile, score) in scores {
             recordBeforeOwner(tile)
-            store.claim(tile, score: score)
+            store.claimSpeed(tile, speedMph: score)
         }
         driveDistanceMeters = TileScoring.movementStats(for: cleanedPath).distanceMeters
         return scores
@@ -286,7 +286,11 @@ public final class DriveTracker {
         let cleaned = GPSOutlierFilter.filterOutliers(drive.rawPath)
         let crossed = TileScoring.tilesCrossed(for: cleaned)
         let scores = TileScoring.perTileScores(for: cleaned)
-        let loopScore = scores.isEmpty ? 0 : scores.values.reduce(0, +) / Double(scores.count)
+        let strengths = Dictionary(uniqueKeysWithValues: scores.map { tile, rawScore in
+            let refSpeed = store.tiles[tile]?.refSpeed ?? Strength.referenceSpeedPrior
+            return (tile, Strength.strength(speedMph: rawScore, refSpeed: refSpeed))
+        })
+        let loopScore = strengths.isEmpty ? 0 : strengths.values.reduce(0, +) / Double(strengths.count)
         // wall = trail ∪ territory owned BEFORE this drive
         // using the start snapshot (not live claimedCells) keeps freshly-captured interior out of the wall,
         // so re-triggers re-compute the same interior idempotently instead of recursively filling inward.

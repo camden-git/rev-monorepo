@@ -38,15 +38,32 @@ public struct TileDTO: Decodable, Sendable, Equatable {
     public let h3: UInt64
     public let owner: String
     public let claimScore: Double
+    public let refSpeed: Double
+    public let obsCount: Int
+    public let captures: Int
     public let lastDrivenAt: Date
     public let isHome: Bool
     public let updated: Date
 
-    public init(id: String, h3: UInt64, owner: String, claimScore: Double, lastDrivenAt: Date, isHome: Bool, updated: Date) {
+    public init(
+        id: String,
+        h3: UInt64,
+        owner: String,
+        claimScore: Double,
+        refSpeed: Double = Strength.referenceSpeedPrior,
+        obsCount: Int = 0,
+        captures: Int = 0,
+        lastDrivenAt: Date,
+        isHome: Bool,
+        updated: Date
+    ) {
         self.id = id
         self.h3 = h3
         self.owner = owner
         self.claimScore = claimScore
+        self.refSpeed = refSpeed
+        self.obsCount = obsCount
+        self.captures = captures
         self.lastDrivenAt = lastDrivenAt
         self.isHome = isHome
         self.updated = updated
@@ -56,6 +73,9 @@ public struct TileDTO: Decodable, Sendable, Equatable {
         case id, owner, updated
         case h3
         case claimScore = "claim_score"
+        case refSpeed = "ref_speed"
+        case obsCount = "obs_count"
+        case captures
         case lastDrivenAt = "last_driven_at"
         case isHome = "is_home"
     }
@@ -72,6 +92,9 @@ public struct TileDTO: Decodable, Sendable, Equatable {
         }
         h3 = parsed
         claimScore = try c.decodeIfPresent(Double.self, forKey: .claimScore) ?? 0
+        refSpeed = try c.decodeIfPresent(Double.self, forKey: .refSpeed) ?? Strength.referenceSpeedPrior
+        obsCount = try c.decodeIfPresent(Int.self, forKey: .obsCount) ?? 0
+        captures = try c.decodeIfPresent(Int.self, forKey: .captures) ?? 0
         lastDrivenAt = try c.decodeIfPresent(Date.self, forKey: .lastDrivenAt) ?? .distantPast
         isHome = try c.decodeIfPresent(Bool.self, forKey: .isHome) ?? false
     }

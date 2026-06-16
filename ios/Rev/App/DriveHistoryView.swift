@@ -41,15 +41,15 @@ struct DriveHistoryView: View {
         return List {
                 Section {
                     HStack(spacing: 12) {
-                        statCell("\(stats.tilesHeld)", "Tiles held", .blue)
+                        statCell(String(format: "%.1f", stats.empireScore), "Empire score", .blue)
                         statCell(
                             "\(stats.tilesAtRisk)",
                             "At risk",
                             stats.tilesAtRisk > 0 ? .orange : .secondary
                         )
                         statCell(
-                            String(format: "%.0f", stats.strongholdScore),
-                            "Stronghold mph",
+                            String(format: "%.1f", stats.strongholdScore),
+                            "Stronghold",
                             .blue
                         )
                     }

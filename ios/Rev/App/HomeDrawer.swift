@@ -190,7 +190,7 @@ struct HomeDrawer: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     rankCard(rank: rank, tiles: stats.tilesHeld, drivers: board.count)
-                    statCard("\(stats.tilesHeld)", "Tiles held", .blue, "square.grid.3x3.fill")
+                    statCard(String(format: "%.1f", stats.empireScore), "Empire score", .blue, "square.grid.3x3.fill")
                     statCard(
                         "\(stats.tilesAtRisk)",
                         "At risk",
@@ -198,8 +198,8 @@ struct HomeDrawer: View {
                         "exclamationmark.triangle.fill"
                     )
                     statCard(
-                        String(format: "%.0f", stats.strongholdScore),
-                        "Stronghold mph",
+                        String(format: "%.1f", stats.strongholdScore),
+                        "Stronghold",
                         .blue,
                         "bolt.fill"
                     )
@@ -357,7 +357,7 @@ struct HomeDrawer: View {
         guard let owner = tracker.contestedOwnerName else { return "—" }
         if owner == "Unclaimed" { return "open tile" }
         if let score = tracker.contestedScore {
-            return String(format: "vs %@ %.0f", owner, score)
+            return String(format: "vs %@ %.1f", owner, score)
         }
         return "vs \(owner)"
     }

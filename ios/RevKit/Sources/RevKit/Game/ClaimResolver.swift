@@ -7,12 +7,26 @@ public enum ClaimResolver {
     public struct TileState: Equatable, Sendable {
         public var ownerId: String
         public var claimScore: Double
+        public var refSpeed: Double
+        public var obsCount: Int
+        public var captures: Int
         public var lastDrivenAt: Date
         public var isHome: Bool
 
-        public init(ownerId: String, claimScore: Double, lastDrivenAt: Date, isHome: Bool) {
+        public init(
+            ownerId: String,
+            claimScore: Double,
+            refSpeed: Double = Strength.referenceSpeedPrior,
+            obsCount: Int = 0,
+            captures: Int = 0,
+            lastDrivenAt: Date,
+            isHome: Bool
+        ) {
             self.ownerId = ownerId
             self.claimScore = claimScore
+            self.refSpeed = refSpeed
+            self.obsCount = obsCount
+            self.captures = captures
             self.lastDrivenAt = lastDrivenAt
             self.isHome = isHome
         }

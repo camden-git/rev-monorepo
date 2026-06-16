@@ -3,8 +3,7 @@ import SwiftUI
 
 /// territory leaderboard
 ///
-/// lifetime drive stats only exist for the local player, so ranking uses current
-/// territory size
+/// ranking uses Score Metric v2's value-weighted empire score
 struct LeaderboardView: View {
     let store: TerritoryStore
     /// when pushed inside a hub/drawer, drop the wrapping stack + Done button
@@ -58,10 +57,10 @@ struct LeaderboardView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text("\(entry.tilesHeld)")
+                Text(String(format: "%.1f", entry.empireScore))
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(.blue)
-                Text("tiles")
+                Text("\(entry.tilesHeld) tiles")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

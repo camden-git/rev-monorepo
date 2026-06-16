@@ -28,7 +28,7 @@ type EncloseOptions struct {
 	// Owned cells act as walls so leaving and returning to your own territory
 	// closes a loop without any perimeter-walking code
 	Owned map[uint64]bool
-	// LoopScore is the representative drive score (mph) used as the gradient's
+	// LoopScore is the representative claim strength used as the gradient's
 	// boundary value
 	LoopScore float64
 	// MinArea is the minimum enclosed hexes to count (docs §Guardrails: >=3)
