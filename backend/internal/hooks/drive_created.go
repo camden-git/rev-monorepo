@@ -24,9 +24,15 @@ func RegisterDriveHooks(app core.App) {
 	app.OnRecordAfterCreateSuccess("drives").BindFunc(func(e *core.RecordEvent) error {
 		// the drive is already persisted. Resolution runs in its own transaction,
 		// if it fails we log and still return success so the client's upload queue
-		// flips uploaded=true. the client reconciles tile state on the next delta-poll anyway
+		// flips uploaded=true. the client reconciles tile state on the next delta-poll anyway.
+		// Also persist the failure on the drive so it is queryable/retryable
+		// rather than living only in the logs
 		if err := resolveDrive(e.App, e.Record); err != nil {
 			e.App.Logger().Error("drive resolution failed", "drive", e.Record.Id, "error", err)
+			e.Record.Set("resolve_error", err.Error())
+			if saveErr := e.App.Save(e.Record); saveErr != nil {
+				e.App.Logger().Error("failed to record drive resolve_error", "drive", e.Record.Id, "error", saveErr)
+			}
 		}
 		return e.Next()
 	})

@@ -181,7 +181,7 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         let path = request.url?.path ?? "<unknown>"
         let query = request.url?.query.map { "?\($0)" } ?? ""
         #if canImport(os)
-        logger.error("PocketBase \(method, privacy: .public) \(path + query, privacy: .public) failed status=\(status) detail=\(detail, privacy: .public)")
+        logger.error("PocketBase \(method, privacy: .public) \(path + query, privacy: .public) failed status=\(status) detail=\(detail, privacy: .private)")
         #else
         print("PocketBase \(method) \(path)\(query) failed status=\(status) detail=\(detail)")
         #endif

@@ -2,6 +2,9 @@ import Foundation
 #if canImport(Security)
 import Security
 #endif
+#if canImport(os)
+import os
+#endif
 
 /// stores the PocketBase auth token
 public protocol TokenStore: Sendable {
@@ -76,13 +79,27 @@ public final class KeychainTokenStore: TokenStore, @unchecked Sendable {
         if status == errSecItemNotFound {
             var add = baseQuery()
             add[kSecValueData as String] = data
-            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            SecItemAdd(add as CFDictionary, nil)
+            // ThisDeviceOnly: the bearer token must not ride along in encrypted
+            // iCloud/iTunes Keychain backups to other devices.
+            add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            let addStatus = SecItemAdd(add as CFDictionary, nil)
+            if addStatus != errSecSuccess { logKeychainFailure("add", addStatus) }
+        } else if status != errSecSuccess {
+            logKeychainFailure("update", status)
         }
     }
 
     public func clear() {
         SecItemDelete(baseQuery() as CFDictionary)
+    }
+
+    /// A failed write means `load()` later returns nil and the user silently
+    /// appears signed out
+    private func logKeychainFailure(_ op: String, _ status: OSStatus) {
+        #if canImport(os)
+        Logger(subsystem: "app.driverev.Rev", category: "TokenStore")
+            .error("Keychain \(op, privacy: .public) failed: status=\(status, privacy: .public)")
+        #endif
     }
 }
 #endif

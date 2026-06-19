@@ -72,7 +72,10 @@ func authWithInvite(e *core.RequestEvent) error {
 		}
 		uses := invite.GetInt("uses")
 		maxUses := invite.GetInt("max_uses")
-		if maxUses > 0 && uses >= maxUses {
+		if maxUses <= 0 {
+			return e.BadRequestError("Invite code is not redeemable.", nil)
+		}
+		if uses >= maxUses {
 			return e.BadRequestError("Invite code has no uses left.", nil)
 		}
 

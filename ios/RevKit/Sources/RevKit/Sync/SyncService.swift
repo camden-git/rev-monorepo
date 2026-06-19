@@ -495,7 +495,8 @@ public final class SyncService {
 
     private func logSyncFailure(_ message: String) {
         #if canImport(os)
-        logger.error("\(message, privacy: .public)")
+        // message may include a PocketBase error body containing user PII
+        logger.error("\(message, privacy: .private)")
         #else
         print("SyncService failure: \(message)")
         #endif
