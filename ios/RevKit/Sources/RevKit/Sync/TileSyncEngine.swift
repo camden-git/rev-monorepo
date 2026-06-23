@@ -56,6 +56,14 @@ public final class TileSyncEngine {
     }
 
     @discardableResult
+    public func fullResync() async throws -> Int {
+        let tiles = try await client.listTiles(updatedSince: nil)
+        store.reconcileTiles(authoritative: tiles)
+        cursor.lastSync = tiles.map(\.updated).max()
+        return tiles.count
+    }
+
+    @discardableResult
     public func sync(h3Cells: Set<UInt64>) async throws -> Int {
         let tiles = try await client.listTiles(h3Cells: h3Cells)
         store.applyRemoteTiles(tiles)

@@ -55,6 +55,74 @@ struct TileSyncEngineTests {
         #expect(client.listSinceArgs.last == newer)
     }
 
+    @Test func fullResyncPrunesLocalTilesAbsentFromServer() async throws {
+        let store = makeStore()
+        let stale = SyncFixtures.cell &+ 8001
+        let live = SyncFixtures.cell &+ 8002
+        store.claim(stale, score: 15)
+        store.claim(live, score: 15)
+
+        let client = MockPocketBaseClient()
+        let updated = Date(timeIntervalSince1970: 1_700_002_000)
+        client.onListTiles = { _ in [makeTileDTO(live, owner: "srv", score: 99, updated: updated)] }
+
+        let cursor = InMemorySyncCursor()
+        let count = try await TileSyncEngine(client: client, store: store, cursor: cursor).fullResync()
+
+        #expect(count == 1)
+        #expect(store.tiles[stale] == nil)                // pruned: the backend no longer has it
+        #expect(store.tiles[live]?.ownerId == "srv")      // reconciled onto the server's view
+        #expect(client.listSinceArgs.last == .some(nil))  // full pull
+        #expect(cursor.lastSync == updated)               // cursor re-armed for later deltas
+    }
+
+    @Test func sessionRestorePrunesStaleLocalTilesAfterBackendReset() async throws {
+        let store = makeStore()
+        let stale = SyncFixtures.cell &+ 8003 // cached from before the backend was reset
+        store.claim(stale, score: 20)
+        #expect(store.tiles[stale] != nil)
+
+        let client = MockPocketBaseClient()
+        client.onAuthRefresh = {
+            AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: "Cam"))
+        }
+        client.onListTiles = { _ in [] } // backend tiles collection was wiped
+
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: InMemoryTokenStore(token: "stored"),
+            cursor: InMemorySyncCursor()
+        )
+        await sync.restoreSessionIfPossible()
+
+        #expect(sync.currentUserId == "me")
+        #expect(store.tiles[stale] == nil) // backend-authoritative, stale cache pruned on relaunch
+    }
+
+    @Test func reconcileTilesKeepsCacheWhenFetchFails() async throws {
+        let store = makeStore()
+        let cell = SyncFixtures.cell &+ 8004
+        store.claim(cell, score: 20)
+
+        let client = MockPocketBaseClient()
+        client.onListTiles = { _ in throw URLError(.notConnectedToInternet) }
+
+        let sync = SyncService(
+            store: store,
+            context: Self.container.mainContext,
+            client: client,
+            tokenStore: InMemoryTokenStore(),
+            cursor: InMemorySyncCursor()
+        )
+        sync.adoptSession(AuthResponse(token: "tok", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        await sync.reconcileTiles()
+
+        #expect(store.tiles[cell] != nil) // offline reconcile must not prune the cache
+    }
+
     @Test func emptyDeltaLeavesCursorUnchanged() async throws {
         let store = makeStore()
         let client = MockPocketBaseClient() // default returns []

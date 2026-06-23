@@ -123,6 +123,8 @@ public final class SyncService {
             lastErrorKind = nil
             lastDebugMessage = nil
             await refreshAfterSignIn()
+            await uploadPending()
+            await reconcileTiles()
         } catch {
             recordSyncFailure(error, operation: "restoreSession")
         }
@@ -154,6 +156,22 @@ public final class SyncService {
         }
         if result.uploaded > 0, !currentVisibleTileCells.isEmpty {
             await pollVisibleTiles(h3Cells: currentVisibleTileCells, force: true)
+        }
+    }
+
+    /// backend-authoritative full tile reconcile (see `TileSyncEngine.fullResync`).
+    /// run on session restore so tiles deleted server-side - or a reset collection -
+    /// don't linger in the local cache across relaunches. only prunes on a
+    /// successful fetch, so an offline restore keeps the cached tiles intact.
+    public func reconcileTiles() async {
+        guard currentUserId != nil else { return }
+        do {
+            _ = try await TileSyncEngine(client: client, store: store, cursor: cursor).fullResync()
+            lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
+        } catch {
+            recordSyncFailure(error, operation: "reconcileTiles", visible: false)
         }
     }
 

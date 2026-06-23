@@ -202,6 +202,21 @@ public final class TerritoryStore {
         }
     }
 
+    /// reconcile the local cache against the server's complete tile set
+    public func reconcileTiles(authoritative remote: [TileDTO]) {
+        let live = Set(remote.map(\.h3))
+        let stale = tiles.keys.filter { !live.contains($0) }
+        for cell in stale {
+            if let record = tileRecords[cell] {
+                context.delete(record)
+            }
+            tileRecords[cell] = nil
+            tiles[cell] = nil
+        }
+        applyRemoteTiles(remote)
+        saveImmediately()
+    }
+
     /// collapse the locally-generated player id (a `UUID` created before sign-in)
     /// onto the authenticated PocketBase user id, re-pointing every tile the local
     /// player already owns
