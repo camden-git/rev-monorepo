@@ -209,7 +209,7 @@ public struct HexMapView: UIViewRepresentable {
 
                 // stroke-less band fills first
                 for (band, bandCells) in cellsByBand {
-                    guard let overlay = H3Grid.claimedOverlay(for: bandCells) else { continue }
+                    guard let overlay = H3Grid.filledCellsOverlay(for: bandCells) else { continue }
                     claimFillOverlays.append(overlay)
                     claimFillStyles[ObjectIdentifier(overlay)] = (color, Self.fillAlpha(forBand: band))
                     mapView.addOverlay(overlay)

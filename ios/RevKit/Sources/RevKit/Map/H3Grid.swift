@@ -92,4 +92,14 @@ public enum H3Grid {
         guard let merged = try? cells.multiPolygon else { return nil }
         return MKMultiPolygon(from: merged)
     }
+
+    static func filledCellsOverlay(for cellIndices: Set<UInt64>) -> MKMultiPolygon? {
+        guard !cellIndices.isEmpty else { return nil }
+        let polygons = cellIndices.compactMap { id -> MKPolygon? in
+            guard let loop = try? H3Cell(id).boundary else { return nil }
+            return MKPolygon(loop)
+        }
+        guard !polygons.isEmpty else { return nil }
+        return MKMultiPolygon(polygons)
+    }
 }
