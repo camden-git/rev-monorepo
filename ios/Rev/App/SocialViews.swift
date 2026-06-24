@@ -19,36 +19,36 @@ struct SocialHubView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Picker("Section", selection: $pane) {
-                    ForEach(Pane.allCases) { option in
-                        Text(label(for: option)).tag(option)
+            content
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Picker("Section", selection: $pane) {
+                            ForEach(Pane.allCases) { option in
+                                Text(label(for: option)).tag(option)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(minWidth: 240)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done", action: onDone)
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-
-                Divider()
-
-                switch pane {
-                case .feed:
-                    ActivityFeedView(store: store, social: social, embedded: true)
-                case .friends:
-                    FollowListView(store: store, social: social, embedded: true)
-                case .discover:
-                    FindPeopleView(store: store, social: social, sync: sync, embedded: true)
-                }
-            }
-            .navigationTitle("Social")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
-                }
-            }
         }
         .onAppear { pane = initialPane }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch pane {
+        case .feed:
+            ActivityFeedView(store: store, social: social, embedded: true)
+        case .friends:
+            FollowListView(store: store, social: social, embedded: true)
+        case .discover:
+            FindPeopleView(store: store, social: social, sync: sync, embedded: true)
+        }
     }
 
     private func label(for pane: Pane) -> String {

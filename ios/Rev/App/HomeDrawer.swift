@@ -125,30 +125,45 @@ struct HomeDrawer: View {
 
     /// entry point to the social surface
     private var socialButton: some View {
-        Button { showSocial = true } label: {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.blue)
-                .frame(width: 52, height: 52)
-                .background(.regularMaterial, in: Circle())
-                .overlay(alignment: .topTrailing) {
-                    if social.incomingRequestCount > 0 {
-                        Text("\(social.incomingRequestCount)")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(.red, in: Capsule())
-                            .offset(x: 4, y: -2)
-                    }
+        Group {
+            if #available(iOS 26, *) {
+                Button { showSocial = true } label: { socialIcon }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+            } else {
+                Button { showSocial = true } label: {
+                    socialIcon.background(.ultraThinMaterial, in: Circle())
                 }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) { requestBadge }
         .accessibilityLabel(
             social.incomingRequestCount > 0
                 ? "Social, \(social.incomingRequestCount) pending requests"
                 : "Social"
         )
+    }
+
+    private var socialIcon: some View {
+        Image(systemName: "person.2.fill")
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(.blue)
+            .frame(width: 46, height: 46)
+    }
+
+    /// red notification badge for pending follow requests
+    @ViewBuilder
+    private var requestBadge: some View {
+        if social.incomingRequestCount > 0 {
+            Text("\(social.incomingRequestCount)")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(.red, in: Capsule())
+                .offset(x: 4, y: -2)
+        }
     }
 
     private var sessionRecoveryButton: some View {
