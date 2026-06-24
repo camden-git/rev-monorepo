@@ -75,6 +75,23 @@ public protocol PocketBaseClient: Sendable {
     /// permanently delete the signed-in user and everything tied to them
     /// `POST /api/rev/account/delete`
     func deleteAccount() async throws
+
+    /// register an APNs device token for push notifications
+    /// `POST /api/rev/devices`
+    func registerDevice(token: String, environment: PushEnvironment) async throws
+
+    /// drop an APNs device token (sign-out, permission revoked)
+    /// `POST /api/rev/devices/unregister`
+    func unregisterDevice(token: String) async throws
+}
+
+/// which APNs host a device token is valid against. A build signed with the
+/// development aps-environment yields a sandbox token; a distribution build
+/// yields a production token. The value is reported to the backend so it pushes
+/// to the matching APNs host.
+public enum PushEnvironment: String, Sendable {
+    case sandbox
+    case production
 }
 
 /// API connection settings

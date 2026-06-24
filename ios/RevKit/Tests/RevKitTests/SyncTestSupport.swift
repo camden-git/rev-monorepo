@@ -132,6 +132,21 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     func acceptFollow(edgeId: String) async throws {}
 
     func removeFollow(edgeId: String) async throws {}
+
+    var onRegisterDevice: @Sendable (String, PushEnvironment) throws -> Void = { _, _ in }
+    var onUnregisterDevice: @Sendable (String) throws -> Void = { _ in }
+    private(set) var registeredDevices: [(token: String, environment: PushEnvironment)] = []
+    private(set) var unregisteredTokens: [String] = []
+
+    func registerDevice(token: String, environment: PushEnvironment) async throws {
+        lock.withLock { registeredDevices.append((token, environment)) }
+        try onRegisterDevice(token, environment)
+    }
+
+    func unregisterDevice(token: String) async throws {
+        lock.withLock { unregisteredTokens.append(token) }
+        try onUnregisterDevice(token)
+    }
 }
 
 // MARK: realtime mock

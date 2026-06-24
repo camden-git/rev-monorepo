@@ -175,6 +175,22 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         _ = try await send(request, decoding: TileClaimResponse.self) // `{ "ok": true }`
     }
 
+    public func registerDevice(token: String, environment: PushEnvironment) async throws {
+        var request = try makeRequest(path: "/api/rev/devices", method: "POST", authed: true)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "token": token,
+            "platform": "ios",
+            "environment": environment.rawValue,
+        ])
+        try await send(request)
+    }
+
+    public func unregisterDevice(token: String) async throws {
+        var request = try makeRequest(path: "/api/rev/devices/unregister", method: "POST", authed: true)
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["token": token])
+        try await send(request)
+    }
+
     // MARK: request plumbing
 
     private func makeRequest(path: String, method: String, authed: Bool, query: [URLQueryItem] = []) throws -> URLRequest {

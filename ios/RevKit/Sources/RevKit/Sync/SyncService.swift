@@ -37,6 +37,10 @@ public final class SyncService {
     private var attemptedSessionRestore = false
     private var currentVisibleTileCells: Set<UInt64> = []
     private var currentVisibleTileParents: Set<UInt64> = []
+    /// last APNs device token handed to us, registered with the backend once a
+    /// session exists (the token can arrive before or after sign-in)
+    private var deviceToken: String?
+    private var deviceEnvironment: PushEnvironment = .production
 
     #if canImport(os)
     private let logger = Logger(subsystem: "app.driverev.RevKit", category: "SyncService")
@@ -98,8 +102,29 @@ public final class SyncService {
 
     /// roster + profile refresh to run after any successful sign-in:
     public func refreshAfterSignIn() async {
+        // device registration is independent of the profile push, so run it even
+        // if pushProfile bails (it short-circuits the rest below)
+        await registerPendingDevice()
         guard await pushProfile() else { return }
         await syncRoster()
+    }
+
+    /// remember the APNs device token and register it with the backend. Safe to
+    /// call before sign-in: the token is held and registered once a session
+    /// exists (see `refreshAfterSignIn`).
+    public func registerDeviceToken(_ token: String, environment: PushEnvironment) async {
+        deviceToken = token
+        deviceEnvironment = environment
+        await registerPendingDevice()
+    }
+
+    private func registerPendingDevice() async {
+        guard currentUserId != nil, let token = deviceToken else { return }
+        do {
+            try await client.registerDevice(token: token, environment: deviceEnvironment)
+        } catch {
+            recordSyncFailure(error, operation: "registerDevice", visible: false)
+        }
     }
 
     public func restoreSessionIfPossible() async {
@@ -355,10 +380,21 @@ public final class SyncService {
     }
 
     public func signOut() {
-        clearSession()
+        // drop the UI session immediately for a snappy sign-out, but keep the
+        // auth token in the store just long enough to unregister this device so a
+        // shared phone stops receiving the signed-out user's pushes. the token is
+        // captured before the background task so a re-sign-in can't race it.
+        let token = deviceToken
+        stopRealtime()
+        stopHeartbeat()
+        currentUserId = nil
         lastError = nil
         lastErrorKind = nil
         lastDebugMessage = nil
+        Task { [weak self] in
+            if let token { try? await self?.client.unregisterDevice(token: token) }
+            self?.tokenStore.clear()
+        }
     }
 
     /// permanently delete the server account, then wipe every trace of it from the
