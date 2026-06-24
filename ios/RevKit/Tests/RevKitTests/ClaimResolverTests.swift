@@ -37,8 +37,8 @@ struct ClaimResolverTests {
     }
 
     @Test func beatingDecayedOpponentCaptures() {
-        // 80 mph driven 2 weeks ago decays to ~11 mph
-        let stale = state(owner: "rival", score: 80, drivenAgo: 14 * 24 * 3600)
+        // 80 mph driven 6 weeks ago (2τ, τ=3wk) decays to ~11 mph
+        let stale = state(owner: "rival", score: 80, drivenAgo: 6 * 7 * 24 * 3600)
         // 25 mph > 11 mph
         let outcome = ClaimResolver.resolve(current: stale, claimantId: "me", incomingScore: 25, now: now)
         #expect(outcome == .captured(score: 25))

@@ -44,8 +44,8 @@ func TestReDrivingOwnTileTakesTheMax(t *testing.T) {
 }
 
 func TestBeatingDecayedOpponentCaptures(t *testing.T) {
-	// 80 mph driven 2 weeks ago decays to ~11 mph; 25 > 11
-	stale := tileState("rival", 80, 14*24*time.Hour, false)
+	// 80 mph driven 6 weeks ago (2τ, τ=3wk) decays to ~11 mph; 25 > 11
+	stale := tileState("rival", 80, 6*7*24*time.Hour, false)
 	expectOutcome(t, Resolve(stale, "me", 25, claimNow), Captured, 25)
 }
 

@@ -74,11 +74,12 @@ struct EmpireStatsTests {
         #expect(abs(s.empireScore - expected) < 1e-9)
     }
 
-    /// a tile driven recently is not at-risk but one untouched for 2 weeks is
+    /// a tile driven recently is not at-risk but one untouched for a month is
+    /// (τ=3wk, so the half-life is ~14.6 days; 28 days is comfortably past it)
     @Test func staleTileIsAtRiskFreshIsNot() {
         let s = compute([
             tile(owner: me, score: 30, daysAgo: 0),   // fresh
-            tile(owner: me, score: 30, daysAgo: 14),  // stale
+            tile(owner: me, score: 30, daysAgo: 28),  // stale
         ])
         #expect(s.tilesHeld == 2)
         #expect(s.tilesAtRisk == 1)
