@@ -291,7 +291,7 @@ struct HomeDrawer: View {
                     .foregroundStyle(.blue)
                 Spacer()
                 if let summary = record.summary {
-                    Text("+\(summary.totalGained)")
+                    Text("\(summary.tilesDriven)")
                         .font(.headline.monospacedDigit())
                         .foregroundStyle(.blue)
                 }

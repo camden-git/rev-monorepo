@@ -63,10 +63,17 @@ struct DriveHistoryView: View {
                     LabeledContent("Distance") {
                         Text(lifetimeDistanceText(for: stats)).monospacedDigit()
                     }
-                    LabeledContent("Tiles gained") {
-                        Text("+\(stats.lifetimeTilesGained)")
+                    LabeledContent("Tiles driven") {
+                        Text("\(stats.lifetimeTilesDriven)")
                             .monospacedDigit()
                             .foregroundStyle(.green)
+                    }
+                    if stats.lifetimeTilesGained > 0 {
+                        LabeledContent("Tiles gained") {
+                            Text("+\(stats.lifetimeTilesGained)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -137,7 +144,7 @@ struct DriveHistoryView: View {
             }
             Spacer()
             if let summary = record.summary {
-                Text("+\(summary.totalGained)")
+                Text("\(summary.tilesDriven)")
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(.blue)
             }

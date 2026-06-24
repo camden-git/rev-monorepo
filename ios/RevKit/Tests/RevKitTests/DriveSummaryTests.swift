@@ -35,6 +35,7 @@ struct DriveSummaryTests {
         #expect(s.tilesReinforced == 1)
         #expect(s.tilesClaimed == 0)
         #expect(s.totalGained == 0)
+        #expect(s.tilesDriven == 1)
     }
 
     /// enclosure provenance wins regardless of who (if anyone) held the tile before
@@ -79,6 +80,7 @@ struct DriveSummaryTests {
         #expect(s.tilesReinforced == 1)
         #expect(s.tilesEnclosed == 1)
         #expect(s.totalGained == 6) // 2 claimed + 3 captured + 1 enclosed
+        #expect(s.tilesDriven == 7) // + 1 reinforced
     }
 
     /// the movement metrics are carried through verbatim

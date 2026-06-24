@@ -228,7 +228,7 @@ struct RootView: View {
     }
 
     private func toastHeadline(_ s: DriveSummary) -> String {
-        var parts = ["+\(s.totalGained) tiles"]
+        var parts = ["\(s.tilesDriven) tiles"]
         if s.totalCaptured > 0 { parts.append("\(s.totalCaptured) captured") }
         if s.tilesEnclosed > 0 { parts.append("\(s.tilesEnclosed) enclosed") }
         return parts.joined(separator: " · ")

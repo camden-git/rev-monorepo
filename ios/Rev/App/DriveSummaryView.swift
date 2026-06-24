@@ -67,7 +67,7 @@ struct DriveSummaryView: View {
         VStack(spacing: 4) {
             Text("Drive complete")
                 .font(.title3.weight(.semibold))
-            Text("+\(summary.totalGained) tiles")
+            Text("\(summary.tilesDriven) tiles")
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.blue)
                 .contentTransition(.numericText())

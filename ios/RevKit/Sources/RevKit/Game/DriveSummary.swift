@@ -68,8 +68,10 @@ public struct DriveSummary: Codable, Equatable, Sendable {
 
     public var totalCaptured: Int { capturedByOpponent.values.reduce(0, +) }
 
-    /// every tile the local player walked away with this drive
+    /// net new ground won this drive (newly claimed + captured from rivals + enclosed)
     public var totalGained: Int { tilesClaimed + totalCaptured + tilesEnclosed }
+
+    public var tilesDriven: Int { totalGained + tilesReinforced }
 
     /// the movement metrics half of a summary
     ///

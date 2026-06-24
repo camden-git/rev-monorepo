@@ -18,8 +18,10 @@ public struct EmpireStats: Equatable, Sendable {
     public var totalDrives: Int
     /// sum of `distanceMeters` across drive summaries
     public var lifetimeDistanceMeters: Double
-    /// sum of `totalGained` across drive summaries
+    /// sum of `totalGained` across drive summaries (net new ground)
     public var lifetimeTilesGained: Int
+    /// sum of `tilesDriven` across drive summaries
+    public var lifetimeTilesDriven: Int
     /// the at-risk threshold used, echoed for the view
     public var atRiskFraction: Double
 
@@ -31,6 +33,7 @@ public struct EmpireStats: Equatable, Sendable {
         totalDrives: Int = 0,
         lifetimeDistanceMeters: Double = 0,
         lifetimeTilesGained: Int = 0,
+        lifetimeTilesDriven: Int = 0,
         atRiskFraction: Double = 0.5
     ) {
         self.tilesHeld = tilesHeld
@@ -40,6 +43,7 @@ public struct EmpireStats: Equatable, Sendable {
         self.totalDrives = totalDrives
         self.lifetimeDistanceMeters = lifetimeDistanceMeters
         self.lifetimeTilesGained = lifetimeTilesGained
+        self.lifetimeTilesDriven = lifetimeTilesDriven
         self.atRiskFraction = atRiskFraction
     }
 
@@ -73,6 +77,7 @@ public struct EmpireStats: Equatable, Sendable {
         for summary in driveSummaries {
             stats.lifetimeDistanceMeters += summary.distanceMeters
             stats.lifetimeTilesGained += summary.totalGained
+            stats.lifetimeTilesDriven += summary.tilesDriven
         }
 
         return stats

@@ -131,5 +131,17 @@ struct EmpireStatsTests {
         #expect(s.totalDrives == 2)
         #expect(s.lifetimeDistanceMeters == 3500)
         #expect(s.lifetimeTilesGained == 8)
+        #expect(s.lifetimeTilesDriven == 8) // no reinforcement here
+    }
+
+    @Test func reDrivesCountAsTilesDrivenNotGained() {
+        let s = compute(
+            [tile(owner: me, score: 30, daysAgo: 0)],
+            drives: [
+                DriveSummary(tilesClaimed: 0, tilesReinforced: 12, distanceMeters: 1600),
+            ]
+        )
+        #expect(s.lifetimeTilesGained == 0)
+        #expect(s.lifetimeTilesDriven == 12)
     }
 }
