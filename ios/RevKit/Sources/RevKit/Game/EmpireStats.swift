@@ -8,6 +8,8 @@ import Foundation
 public struct EmpireStats: Equatable, Sendable {
     /// tiles currently owned by the local player (home hex included)
     public var tilesHeld: Int
+    /// speed-weighted strength
+    public var empireStrength: Double
     /// value-weighted score of currently owned territory
     public var empireScore: Double
     /// held tiles whose decayed score has fallen below `atRiskFraction` of their peak
@@ -27,6 +29,7 @@ public struct EmpireStats: Equatable, Sendable {
 
     public init(
         tilesHeld: Int = 0,
+        empireStrength: Double = 0,
         empireScore: Double = 0,
         tilesAtRisk: Int = 0,
         strongholdScore: Double = 0,
@@ -37,6 +40,7 @@ public struct EmpireStats: Equatable, Sendable {
         atRiskFraction: Double = 0.5
     ) {
         self.tilesHeld = tilesHeld
+        self.empireStrength = empireStrength
         self.empireScore = empireScore
         self.tilesAtRisk = tilesAtRisk
         self.strongholdScore = strongholdScore
@@ -59,6 +63,7 @@ public struct EmpireStats: Equatable, Sendable {
 
         for tile in tiles where tile.ownerId == localPlayerId {
             stats.tilesHeld += 1
+            stats.empireStrength += tile.claimScore
             stats.empireScore += tile.isHome ? 1 : Strength.tileValue(captures: tile.captures)
             stats.strongholdScore = max(stats.strongholdScore, tile.claimScore)
 

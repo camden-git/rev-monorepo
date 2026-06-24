@@ -483,17 +483,21 @@ public final class TerritoryStore {
         public let colorHex: String
         public let isLocal: Bool
         public let tilesHeld: Int
+        /// speed-weighted strength: sum of stored claim strength across held tiles
+        public let empireStrength: Double
         public let empireScore: Double
         public var id: String { playerId }
     }
 
-    /// rank every known player by tiles currently held, descending
+    /// rank every known player by empire strength, descending
     /// players with no tiles still appear
     public func leaderboard() -> [LeaderboardEntry] {
         var counts: [String: Int] = [:]
+        var strengths: [String: Double] = [:]
         var scores: [String: Double] = [:]
         for state in tiles.values {
             counts[state.ownerId, default: 0] += 1
+            strengths[state.ownerId, default: 0] += state.claimScore
             scores[state.ownerId, default: 0] += state.isHome ? 1 : Strength.tileValue(captures: state.captures)
         }
         return players
@@ -504,12 +508,13 @@ public final class TerritoryStore {
                     colorHex: player.colorHex,
                     isLocal: player.isLocal,
                     tilesHeld: counts[player.id] ?? 0,
+                    empireStrength: strengths[player.id] ?? 0,
                     empireScore: scores[player.id] ?? 0
                 )
             }
             .sorted {
-                $0.empireScore != $1.empireScore
-                    ? $0.empireScore > $1.empireScore
+                $0.empireStrength != $1.empireStrength
+                    ? $0.empireStrength > $1.empireStrength
                     : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
             }
     }

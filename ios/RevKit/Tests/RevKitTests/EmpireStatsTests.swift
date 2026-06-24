@@ -45,6 +45,7 @@ struct EmpireStatsTests {
     @Test func emptyWorldIsZeroed() {
         let s = compute([])
         #expect(s.tilesHeld == 0)
+        #expect(s.empireStrength == 0)
         #expect(s.empireScore == 0)
         #expect(s.tilesAtRisk == 0)
         #expect(s.strongholdScore == 0)
@@ -61,6 +62,17 @@ struct EmpireStatsTests {
             tile(owner: "rival", score: 50, daysAgo: 0),
         ])
         #expect(s.tilesHeld == 2)
+    }
+
+    /// empire strength sums the stored claim strength of every held tile
+    @Test func empireStrengthSumsClaimScores() {
+        let s = compute([
+            tile(owner: me, score: 0, daysAgo: 0, isHome: true),
+            tile(owner: me, score: 1.5, daysAgo: 0),
+            tile(owner: me, score: 4.0, daysAgo: 0),
+            tile(owner: "rival", score: 5.0, daysAgo: 0), // not ours, ignored
+        ])
+        #expect(abs(s.empireStrength - 5.5) < 1e-9)
     }
 
     /// empire score weights non-home tiles by their contestedness value

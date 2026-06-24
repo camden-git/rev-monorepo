@@ -3,7 +3,7 @@ import SwiftUI
 
 /// territory leaderboard
 ///
-/// ranking uses Score Metric v2's value-weighted empire score
+/// ranking uses Score Metric v2's speed-weighted empire strength (sum of claim strength)
 struct LeaderboardView: View {
     let store: TerritoryStore
     let social: SocialService
@@ -68,7 +68,7 @@ struct LeaderboardView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text(String(format: "%.1f", entry.empireScore))
+                Text(String(format: "%.1f", entry.empireStrength))
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(.blue)
                 Text("\(entry.tilesHeld) tiles")

@@ -244,7 +244,8 @@ struct HomeDrawer: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     rankCard(rank: rank, tiles: stats.tilesHeld, drivers: board.count)
-                    statCard(String(format: "%.1f", stats.empireScore), "Empire score", .blue, "square.grid.3x3.fill")
+                    statCard(String(format: "%.1f", stats.empireStrength), "Empire strength", .blue, "flame.fill")
+                    statCard(String(format: "%.1f", stats.empireScore), "Empire score", .cyan, "square.grid.3x3.fill")
                     statCard(
                         "\(stats.tilesAtRisk)",
                         "At risk",
