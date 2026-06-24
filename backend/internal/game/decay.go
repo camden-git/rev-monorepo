@@ -7,7 +7,7 @@ import (
 
 // Tau is the decay time constant (REF: docs/game-design.md §Time Decay)
 // port of RevKit Decay.tau
-const Tau = 7 * 24 * 60 * 60 // seconds
+const Tau = 3 * 7 * 24 * 60 * 60 // seconds
 
 // EffectiveScore returns claimScore * exp(-Δt/τ)
 // port of RevKit's Decay.effectiveScore
