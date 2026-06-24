@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
@@ -18,6 +20,11 @@ import (
 )
 
 func main() {
+	// load backend/.env when present so local runs pick up config (APNs creds,
+	// dev seed) without exporting vars by hand. real env vars always win, and a
+	// missing file is a silent no-op (production sets the environment directly).
+	loadDotEnv(".env")
+
 	app := pocketbase.New()
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
@@ -50,6 +57,37 @@ func main() {
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// loadDotEnv reads simple KEY=VALUE lines from the given file and sets any that
+// are not already present in the environment. Comments (#) and blank lines are
+// skipped; surrounding quotes are stripped. A missing file is not an error.
+func loadDotEnv(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.Trim(strings.TrimSpace(value), `"'`)
+		if key == "" {
+			continue
+		}
+		if _, exists := os.LookupEnv(key); !exists {
+			_ = os.Setenv(key, value)
+		}
 	}
 }
 

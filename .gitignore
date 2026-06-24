@@ -28,6 +28,10 @@ backend/pb_data/*
 .env.local
 .env.*.local
 
+# secrets (APNs auth keys etc.)
+.secrets/
+*.p8
+
 # jetbrains
 .idea/
 *.iml
