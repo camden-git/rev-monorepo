@@ -1,6 +1,64 @@
 import RevKit
 import SwiftUI
 
+struct SocialHubView: View {
+    let store: TerritoryStore
+    let social: SocialService
+    let sync: SyncService
+    var initialPane: Pane = .feed
+    var onDone: () -> Void = {}
+
+    enum Pane: String, CaseIterable, Identifiable {
+        case feed = "Feed"
+        case friends = "Friends"
+        case discover = "Discover"
+        var id: String { rawValue }
+    }
+
+    @State private var pane: Pane = .feed
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                Picker("Section", selection: $pane) {
+                    ForEach(Pane.allCases) { option in
+                        Text(label(for: option)).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+
+                Divider()
+
+                switch pane {
+                case .feed:
+                    ActivityFeedView(store: store, social: social, embedded: true)
+                case .friends:
+                    FollowListView(store: store, social: social, embedded: true)
+                case .discover:
+                    FindPeopleView(store: store, social: social, sync: sync, embedded: true)
+                }
+            }
+            .navigationTitle("Social")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done", action: onDone)
+                }
+            }
+        }
+        .onAppear { pane = initialPane }
+    }
+
+    private func label(for pane: Pane) -> String {
+        if pane == .friends, social.incomingRequestCount > 0 {
+            return "Friends (\(social.incomingRequestCount))"
+        }
+        return pane.rawValue
+    }
+}
+
 /// the following feed: recent drives from people the player follows
 struct ActivityFeedView: View {
     let store: TerritoryStore

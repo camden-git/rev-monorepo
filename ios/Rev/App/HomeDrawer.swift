@@ -13,6 +13,7 @@ struct HomeDrawer: View {
     @Binding var showSummary: Bool
 
     @State private var showProfile = false
+    @State private var showSocial = false
     @State private var showSessionRecovery = false
     @State private var selectedDrive: DriveRecord?
 
@@ -68,6 +69,10 @@ struct HomeDrawer: View {
                 }
                 .driveButtonStyle(recording: tracker.isRecording)
 
+                if sync.isSignedIn {
+                    socialButton
+                }
+
                 Button { showProfile = true } label: {
                     PlayerAvatar(
                         colorHex: store.localPlayer.colorHex,
@@ -78,6 +83,11 @@ struct HomeDrawer: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Your profile")
             }
+        }
+        .sheet(isPresented: $showSocial) {
+            SocialHubView(store: store, social: social, sync: sync) { showSocial = false }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showProfile) {
             ProfileHubView(store: store, sync: sync, social: social, signIn: signIn) { showProfile = false }
@@ -111,6 +121,34 @@ struct HomeDrawer: View {
                     .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    /// entry point to the social surface
+    private var socialButton: some View {
+        Button { showSocial = true } label: {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.blue)
+                .frame(width: 52, height: 52)
+                .background(.regularMaterial, in: Circle())
+                .overlay(alignment: .topTrailing) {
+                    if social.incomingRequestCount > 0 {
+                        Text("\(social.incomingRequestCount)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.red, in: Capsule())
+                            .offset(x: 4, y: -2)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            social.incomingRequestCount > 0
+                ? "Social, \(social.incomingRequestCount) pending requests"
+                : "Social"
+        )
     }
 
     private var sessionRecoveryButton: some View {
