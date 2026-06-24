@@ -11,6 +11,7 @@
 		1A1A1A1A1A1A1A1A1A1A1A01 /* PlayerProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B01 /* PlayerProfileView.swift */; };
 		1A1A1A1A1A1A1A1A1A1A1A02 /* EmpireStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B02 /* EmpireStatsView.swift */; };
 		1A1A1A1A1A1A1A1A1A1A1A03 /* SocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B03 /* SocialViews.swift */; };
+		1A1A1A1A1A1A1A1A1A1A1A04 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B04 /* AppDelegate.swift */; };
 		2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F692E402518C09F1A7976B /* ProfileHubView.swift */; };
 		39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */; };
 		50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C0F969107087F96013E67F /* LeaderboardView.swift */; };
@@ -39,6 +40,7 @@
 		2B2B2B2B2B2B2B2B2B2B2B01 /* PlayerProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileView.swift; sourceTree = "<group>"; };
 		2B2B2B2B2B2B2B2B2B2B2B02 /* EmpireStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmpireStatsView.swift; sourceTree = "<group>"; };
 		2B2B2B2B2B2B2B2B2B2B2B03 /* SocialViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialViews.swift; sourceTree = "<group>"; };
+		2B2B2B2B2B2B2B2B2B2B2B04 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveSummaryView.swift; sourceTree = "<group>"; };
 		30F692E402518C09F1A7976B /* ProfileHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileHubView.swift; sourceTree = "<group>"; };
 		32B76981DF5A715E1D4AC6D1 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 				2B2B2B2B2B2B2B2B2B2B2B01 /* PlayerProfileView.swift */,
 				2B2B2B2B2B2B2B2B2B2B2B02 /* EmpireStatsView.swift */,
 				2B2B2B2B2B2B2B2B2B2B2B03 /* SocialViews.swift */,
+				2B2B2B2B2B2B2B2B2B2B2B04 /* AppDelegate.swift */,
 				30F692E402518C09F1A7976B /* ProfileHubView.swift */,
 				136227412603B5999AB44748 /* ProfileSettingsView.swift */,
 				A612DB066C3D529986584A8B /* RevApp.swift */,
@@ -217,6 +220,7 @@
 				1A1A1A1A1A1A1A1A1A1A1A01 /* PlayerProfileView.swift in Sources */,
 				1A1A1A1A1A1A1A1A1A1A1A02 /* EmpireStatsView.swift in Sources */,
 				1A1A1A1A1A1A1A1A1A1A1A03 /* SocialViews.swift in Sources */,
+				1A1A1A1A1A1A1A1A1A1A1A04 /* AppDelegate.swift in Sources */,
 				2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */,
 				76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */,
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,

@@ -12,6 +12,8 @@ struct RootView: View {
     @State private var sync: SyncService
     /// follow graph + activity feed
     @State private var social: SocialService
+    /// push-notification permission + APNs registration, created by the app delegate
+    private let push: PushNotificationManager
 
     /// the post-drive recap surfaces first as a toast, which expands to the full sheet
     @State private var showToast = false
@@ -24,7 +26,8 @@ struct RootView: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var visibleTileSyncTask: Task<Void, Never>?
 
-    init(context: ModelContext) {
+    init(context: ModelContext, push: PushNotificationManager) {
+        self.push = push
         let store = TerritoryStore(context: context)
         _store = State(initialValue: store)
         _tracker = State(initialValue: DriveTracker(store: store))
@@ -53,17 +56,45 @@ struct RootView: View {
                 mapContent
             }
         }
+        .environment(push)
         .task {
+            configurePush()
             await sync.restoreSessionIfPossible()
             reconcileRealtime()
             await refreshSocial()
+            await syncPushRegistration()
         }
         // keep the live tile stream open only while the app is active and signed in
-        .onChange(of: scenePhase) { _, _ in reconcileRealtime() }
+        .onChange(of: scenePhase) { _, _ in
+            reconcileRealtime()
+            Task { await syncPushRegistration() }
+        }
         .onChange(of: sync.isSignedIn) { _, _ in
             reconcileRealtime()
-            Task { await refreshSocial() }
+            Task {
+                await refreshSocial()
+                await syncPushRegistration()
+            }
         }
+    }
+
+    /// hand the APNs token to the sync layer and route taps. set once on launch.
+    private func configurePush() {
+        push.onToken = { token, environment in
+            await sync.registerDeviceToken(token, environment: environment)
+        }
+        push.onOpen = { _ in
+            // surface the hub so a tapped social/tile notification has somewhere to land
+            showDrawer = true
+        }
+    }
+
+    /// prompt for permission the first time the user is signed in and past
+    /// onboarding, and refresh the APNs token on each foreground. Idempotent: the
+    /// system prompt only appears while the status is still undetermined.
+    private func syncPushRegistration() async {
+        guard scenePhase == .active, !store.needsOnboarding, sync.isSignedIn else { return }
+        await push.requestAuthorizationIfNeeded()
     }
 
     private func refreshSocial() async {
@@ -297,5 +328,5 @@ struct SessionRecoveryView: View {
         for: Player.self, TileRecord.self, DriveRecord.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
-    return RootView(context: container.mainContext)
+    return RootView(context: container.mainContext, push: PushNotificationManager())
 }

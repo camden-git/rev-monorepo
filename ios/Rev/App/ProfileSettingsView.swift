@@ -13,6 +13,7 @@ struct ProfileSettingsView: View {
     var onDone: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(PushNotificationManager.self) private var push
 
     @State private var name: String
     @State private var colorHex: String
@@ -110,12 +111,47 @@ struct ProfileSettingsView: View {
                 }
             }
 
+            Section {
+                notificationsRow
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("Get notified when someone captures your tiles or follows you.")
+            }
+
             if let saveError {
                 Section {
                     Text(saveError)
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
+            }
+        }
+        .task { await push.refreshAuthorizationStatus() }
+    }
+
+    @ViewBuilder
+    private var notificationsRow: some View {
+        switch push.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            Label {
+                Text("Notifications On")
+            } icon: {
+                Image(systemName: "bell.fill").foregroundStyle(.green)
+            }
+        case .denied:
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                Label("Enable in Settings", systemImage: "bell.slash")
+            }
+        default:
+            Button {
+                Task { await push.requestAuthorization() }
+            } label: {
+                Label("Turn On Notifications", systemImage: "bell")
             }
         }
     }

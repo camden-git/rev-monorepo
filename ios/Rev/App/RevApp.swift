@@ -4,6 +4,7 @@ import SwiftUI
 
 @main
 struct RevApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     let container: ModelContainer
 
     init() {
@@ -16,7 +17,7 @@ struct RevApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(context: container.mainContext)
+            RootView(context: container.mainContext, push: appDelegate.push)
         }
         .modelContainer(container)
     }

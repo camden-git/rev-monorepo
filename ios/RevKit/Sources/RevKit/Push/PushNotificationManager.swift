@@ -97,8 +97,7 @@ public final class PushNotificationManager {
     }
 
     /// called from the app delegate when the user taps a notification
-    public func handleOpen(userInfo: [AnyHashable: Any]) {
-        guard let content = PushNotificationContent(userInfo: userInfo) else { return }
+    public func handleOpen(_ content: PushNotificationContent) {
         onOpen?(content)
     }
 
