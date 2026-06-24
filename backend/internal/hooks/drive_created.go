@@ -203,7 +203,7 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		return false, strength, "", nil
 
 	case game.Created:
-		if err := createTile(txApp, h3str, userID, outcome.Score, false, nextRef, nextObs, 0, now); err != nil {
+		if err := createTile(txApp, h3str, userID, outcome.Score, false, nextRef, nextObs, 0, speedMph, now); err != nil {
 			return false, strength, "", err
 		}
 		return true, strength, "", nil
@@ -212,6 +212,10 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		setTileWindowParent(existing, h3)
 		setTileReference(existing, nextRef, nextObs)
 		existing.Set("claim_score", outcome.Score)
+
+		if current != nil && strength >= current.ClaimScore {
+			existing.Set("driven_speed", speedMph)
+		}
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
 			return false, strength, "", err
@@ -226,6 +230,7 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		existing.Set("owner", userID)
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("captures", captures)
+		existing.Set("driven_speed", speedMph)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
 			return false, strength, "", err
@@ -320,13 +325,18 @@ func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength floa
 	case game.NoChange:
 		return false, strength, "", nil
 	case game.Created:
-		if err := createTile(txApp, h3str, userID, outcome.Score, false, game.ReferenceSpeedPrior, 0, 0, now); err != nil {
+
+		if err := createTile(txApp, h3str, userID, outcome.Score, false, game.ReferenceSpeedPrior, 0, 0, 0, now); err != nil {
 			return false, strength, "", err
 		}
 		return true, strength, "", nil
 	case game.Reinforced:
 		setTileWindowParent(existing, h3)
 		existing.Set("claim_score", outcome.Score)
+
+		if current != nil && strength >= current.ClaimScore {
+			existing.Set("driven_speed", 0)
+		}
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
 			return false, strength, "", err
@@ -339,6 +349,7 @@ func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength floa
 		existing.Set("owner", userID)
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("captures", captures)
+		existing.Set("driven_speed", 0)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
 			return false, strength, "", err
@@ -361,7 +372,9 @@ func findTile(txApp core.App, h3str string) *core.Record {
 	return rec
 }
 
-func createTile(txApp core.App, h3str, userID string, score float64, isHome bool, refSpeed float64, obsCount int, captures int, now time.Time) error {
+// drivenSpeed is the raw mph that produced score, or 0 when the claim has no
+// measured speed behind it (e.g. an enclosure fill)
+func createTile(txApp core.App, h3str, userID string, score float64, isHome bool, refSpeed float64, obsCount int, captures int, drivenSpeed float64, now time.Time) error {
 	col, err := txApp.FindCollectionByNameOrId("tiles")
 	if err != nil {
 		return err
@@ -376,6 +389,7 @@ func createTile(txApp core.App, h3str, userID string, score float64, isHome bool
 	rec.Set("ref_speed", refSpeed)
 	rec.Set("obs_count", obsCount)
 	rec.Set("captures", captures)
+	rec.Set("driven_speed", drivenSpeed)
 	rec.Set("last_driven_at", now)
 	rec.Set("is_home", isHome)
 	return txApp.Save(rec)

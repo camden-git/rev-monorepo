@@ -51,7 +51,7 @@ func syncHomeTile(app core.App, user *core.Record) error {
 
 		existing := findTile(txApp, homeStr)
 		if existing == nil {
-			return createTile(txApp, homeStr, user.Id, 0, true, game.ReferenceSpeedPrior, 0, 0, time.Now())
+			return createTile(txApp, homeStr, user.Id, 0, true, game.ReferenceSpeedPrior, 0, 0, 0, time.Now())
 		}
 		if existing.GetString("owner") == user.Id && existing.GetBool("is_home") {
 			return nil // already correct

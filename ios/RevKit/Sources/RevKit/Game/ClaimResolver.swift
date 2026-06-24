@@ -10,6 +10,8 @@ public enum ClaimResolver {
         public var refSpeed: Double
         public var obsCount: Int
         public var captures: Int
+        /// raw mph of the drive that set `claimScore`; `0` means unknown
+        public var drivenSpeed: Double
         public var lastDrivenAt: Date
         public var isHome: Bool
 
@@ -19,6 +21,7 @@ public enum ClaimResolver {
             refSpeed: Double = Strength.referenceSpeedPrior,
             obsCount: Int = 0,
             captures: Int = 0,
+            drivenSpeed: Double = 0,
             lastDrivenAt: Date,
             isHome: Bool
         ) {
@@ -27,6 +30,7 @@ public enum ClaimResolver {
             self.refSpeed = refSpeed
             self.obsCount = obsCount
             self.captures = captures
+            self.drivenSpeed = drivenSpeed
             self.lastDrivenAt = lastDrivenAt
             self.isHome = isHome
         }

@@ -41,6 +41,8 @@ public struct TileDTO: Decodable, Sendable, Equatable {
     public let refSpeed: Double
     public let obsCount: Int
     public let captures: Int
+    /// raw mph of the drive that set `claimScore`; `0` means unknown
+    public let drivenSpeed: Double
     public let lastDrivenAt: Date
     public let isHome: Bool
     public let updated: Date
@@ -53,6 +55,7 @@ public struct TileDTO: Decodable, Sendable, Equatable {
         refSpeed: Double = Strength.referenceSpeedPrior,
         obsCount: Int = 0,
         captures: Int = 0,
+        drivenSpeed: Double = 0,
         lastDrivenAt: Date,
         isHome: Bool,
         updated: Date
@@ -64,6 +67,7 @@ public struct TileDTO: Decodable, Sendable, Equatable {
         self.refSpeed = refSpeed
         self.obsCount = obsCount
         self.captures = captures
+        self.drivenSpeed = drivenSpeed
         self.lastDrivenAt = lastDrivenAt
         self.isHome = isHome
         self.updated = updated
@@ -76,6 +80,7 @@ public struct TileDTO: Decodable, Sendable, Equatable {
         case refSpeed = "ref_speed"
         case obsCount = "obs_count"
         case captures
+        case drivenSpeed = "driven_speed"
         case lastDrivenAt = "last_driven_at"
         case isHome = "is_home"
     }
@@ -95,6 +100,7 @@ public struct TileDTO: Decodable, Sendable, Equatable {
         refSpeed = try c.decodeIfPresent(Double.self, forKey: .refSpeed) ?? Strength.referenceSpeedPrior
         obsCount = try c.decodeIfPresent(Int.self, forKey: .obsCount) ?? 0
         captures = try c.decodeIfPresent(Int.self, forKey: .captures) ?? 0
+        drivenSpeed = try c.decodeIfPresent(Double.self, forKey: .drivenSpeed) ?? 0
         lastDrivenAt = try c.decodeIfPresent(Date.self, forKey: .lastDrivenAt) ?? .distantPast
         isHome = try c.decodeIfPresent(Bool.self, forKey: .isHome) ?? false
     }

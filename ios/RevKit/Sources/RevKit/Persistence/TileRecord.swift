@@ -17,6 +17,8 @@ public final class TileRecord {
     public var obsCount: Int
     /// lifetime ownership changes, used for tile value
     public var captures: Int
+    /// raw mph of the drive that set `claimScore`; `0` means unknown
+    public var drivenSpeed: Double = 0
     public var lastDrivenAt: Date
     public var isHome: Bool
 
@@ -27,6 +29,7 @@ public final class TileRecord {
         refSpeed: Double = Strength.referenceSpeedPrior,
         obsCount: Int = 0,
         captures: Int = 0,
+        drivenSpeed: Double = 0,
         lastDrivenAt: Date,
         isHome: Bool
     ) {
@@ -36,6 +39,7 @@ public final class TileRecord {
         self.refSpeed = refSpeed
         self.obsCount = obsCount
         self.captures = captures
+        self.drivenSpeed = drivenSpeed
         self.lastDrivenAt = lastDrivenAt
         self.isHome = isHome
     }

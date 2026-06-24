@@ -177,12 +177,21 @@ struct TileDetailView: View {
         detail.claimScore ?? detail.effectiveScore
     }
 
-    /// reconstruct driven mph + the multiple-of-usual-pace from the stored score,
+    /// the driven mph + multiple-of-usual-pace to show in the breakdown
     private var paceReconstruction: (drove: Double, multiple: Double)? {
-        guard let score = claimMultiple, score > 0 else { return nil }
         let ref = referencePace
+        if let speed = detail.drivenSpeed, speed > 0 {
+            return (drove: speed, multiple: speed / ref)
+        }
+        guard let score = claimMultiple, score > 0 else { return nil }
+        // legacy rows stored the score as raw mph (always above the strength cap)
         if score > Strength.strengthCap {
             return (drove: score, multiple: score / ref)
+        }
+        // a capped strength with no recorded speed can't be turned back into a real
+        // mph
+        if score >= Strength.strengthCap {
+            return nil
         }
         return (drove: score * ref, multiple: score)
     }
@@ -359,6 +368,25 @@ struct TileDetailView: View {
             lastDrivenAt: .now.addingTimeInterval(-3 * 86_400),
             refSpeed: 18,
             obsCount: 7
+        ))
+        .presentationDetents([.medium, .large])
+    }
+}
+
+#Preview("Capped strength, real speed") {
+    Color.gray.sheet(isPresented: .constant(true)) {
+        TileDetailView(detail: HexTileDetail(
+            id: 4,
+            ownerName: "Camden",
+            ownerColorHex: "#3B82F6",
+            isLocalOwner: true,
+            isHome: false,
+            effectiveScore: 5.0,
+            claimScore: 5.0,
+            lastDrivenAt: .now.addingTimeInterval(-2 * 3600),
+            refSpeed: 28,
+            obsCount: 9,
+            drivenSpeed: 41
         ))
         .presentationDetents([.medium, .large])
     }

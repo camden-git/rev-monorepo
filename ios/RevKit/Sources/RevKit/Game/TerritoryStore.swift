@@ -48,6 +48,7 @@ public final class TerritoryStore {
                 refSpeed: record.refSpeed,
                 obsCount: record.obsCount,
                 captures: record.captures,
+                drivenSpeed: record.drivenSpeed,
                 lastDrivenAt: record.lastDrivenAt,
                 isHome: record.isHome
             )
@@ -87,6 +88,7 @@ public final class TerritoryStore {
             // re-drive floor
             upsert(cellIndex, ownerId: claimant, score: newScore, isHome: current?.isHome ?? false, now: now)
         case let .captured(newScore):
+            // a score-based capture (enclosure fill) carries no measured speed
             upsert(
                 cellIndex,
                 ownerId: claimant,
@@ -94,6 +96,7 @@ public final class TerritoryStore {
                 refSpeed: current?.refSpeed ?? Strength.referenceSpeedPrior,
                 obsCount: current?.obsCount ?? 0,
                 captures: (current?.captures ?? 0) + 1,
+                drivenSpeed: 0,
                 isHome: false,
                 now: now
             )
@@ -128,6 +131,7 @@ public final class TerritoryStore {
         switch outcome {
         case .noChange:
             if let current {
+                // only the reference/obs learning step changed
                 upsert(
                     cellIndex,
                     ownerId: current.ownerId,
@@ -135,6 +139,7 @@ public final class TerritoryStore {
                     refSpeed: nextRef,
                     obsCount: nextObs,
                     captures: current.captures,
+                    drivenSpeed: current.drivenSpeed,
                     isHome: current.isHome,
                     now: current.lastDrivenAt
                 )
@@ -147,10 +152,13 @@ public final class TerritoryStore {
                 refSpeed: nextRef,
                 obsCount: nextObs,
                 captures: 0,
+                drivenSpeed: speedMph,
                 isHome: false,
                 now: now
             )
         case let .reinforced(newScore):
+            // re-drive floor: record this drive's speed only when it set the new floor
+            let drove = strength >= (current?.claimScore ?? 0) ? speedMph : (current?.drivenSpeed ?? 0)
             upsert(
                 cellIndex,
                 ownerId: claimant,
@@ -158,6 +166,7 @@ public final class TerritoryStore {
                 refSpeed: nextRef,
                 obsCount: nextObs,
                 captures: current?.captures ?? 0,
+                drivenSpeed: drove,
                 isHome: current?.isHome ?? false,
                 now: now
             )
@@ -169,6 +178,7 @@ public final class TerritoryStore {
                 refSpeed: nextRef,
                 obsCount: nextObs,
                 captures: (current?.captures ?? 0) + 1,
+                drivenSpeed: speedMph,
                 isHome: false,
                 now: now
             )
@@ -196,6 +206,7 @@ public final class TerritoryStore {
                 refSpeed: dto.refSpeed,
                 obsCount: dto.obsCount,
                 captures: dto.captures,
+                drivenSpeed: dto.drivenSpeed,
                 isHome: dto.isHome,
                 now: dto.lastDrivenAt
             )
@@ -247,6 +258,7 @@ public final class TerritoryStore {
                 refSpeed: state.refSpeed,
                 obsCount: state.obsCount,
                 captures: state.captures,
+                drivenSpeed: state.drivenSpeed,
                 lastDrivenAt: state.lastDrivenAt,
                 isHome: state.isHome
             )
@@ -316,6 +328,7 @@ public final class TerritoryStore {
             refSpeed: Strength.referenceSpeedPrior,
             obsCount: 0,
             captures: 0,
+            drivenSpeed: 0,
             isHome: true,
             now: now
         )
@@ -360,6 +373,7 @@ public final class TerritoryStore {
             refSpeed: current?.refSpeed ?? Strength.referenceSpeedPrior,
             obsCount: current?.obsCount ?? 0,
             captures: current?.captures ?? 0,
+            drivenSpeed: current?.drivenSpeed ?? 0,
             isHome: isHome,
             now: now
         )
@@ -372,6 +386,7 @@ public final class TerritoryStore {
         refSpeed: Double,
         obsCount: Int,
         captures: Int,
+        drivenSpeed: Double,
         isHome: Bool,
         now: Date
     ) {
@@ -381,6 +396,7 @@ public final class TerritoryStore {
             record.refSpeed = refSpeed
             record.obsCount = obsCount
             record.captures = captures
+            record.drivenSpeed = drivenSpeed
             record.lastDrivenAt = now
             record.isHome = isHome
         } else {
@@ -391,6 +407,7 @@ public final class TerritoryStore {
                 refSpeed: refSpeed,
                 obsCount: obsCount,
                 captures: captures,
+                drivenSpeed: drivenSpeed,
                 lastDrivenAt: now,
                 isHome: isHome
             )
@@ -403,6 +420,7 @@ public final class TerritoryStore {
             refSpeed: refSpeed,
             obsCount: obsCount,
             captures: captures,
+            drivenSpeed: drivenSpeed,
             lastDrivenAt: now,
             isHome: isHome
         )

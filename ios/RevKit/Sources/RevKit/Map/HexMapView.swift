@@ -20,6 +20,8 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
     public let refSpeed: Double?
     /// how many drives have taught us this road's typical pace
     public let obsCount: Int?
+    /// raw mph of the drive that set `claimScore`; `nil`/`0` means unknown
+    public let drivenSpeed: Double?
 
     public var isClaimed: Bool { ownerName != nil }
 
@@ -33,7 +35,8 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
         claimScore: Double?,
         lastDrivenAt: Date?,
         refSpeed: Double? = nil,
-        obsCount: Int? = nil
+        obsCount: Int? = nil,
+        drivenSpeed: Double? = nil
     ) {
         self.id = id
         self.ownerName = ownerName
@@ -45,6 +48,7 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
         self.lastDrivenAt = lastDrivenAt
         self.refSpeed = refSpeed
         self.obsCount = obsCount
+        self.drivenSpeed = drivenSpeed
     }
 }
 
@@ -398,7 +402,8 @@ public struct HexMapView: UIViewRepresentable {
                     claimScore: state.claimScore,
                     lastDrivenAt: state.lastDrivenAt,
                     refSpeed: state.refSpeed,
-                    obsCount: state.obsCount
+                    obsCount: state.obsCount,
+                    drivenSpeed: state.drivenSpeed
                 )
             } else {
                 detail = HexTileDetail(
