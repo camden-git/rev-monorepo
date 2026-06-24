@@ -32,6 +32,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.driverev.Rev
+        ASSETCATALOG_COMPILER_APPICON_NAME: logodesign
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: true
         GENERATE_INFOPLIST_FILE: true
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_CFBundleDisplayName: Rev

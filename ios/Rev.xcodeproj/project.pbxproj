@@ -22,7 +22,7 @@
 		BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9B7B4275284769A91EF50C5 /* RevKit */; };
 		BD993042EE13D451121A04CD /* PlayerAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */; };
 		CD9D182404C3D85F06D3425A /* ViewStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC0673B770485F7009C4E40F /* ViewStyles.swift */; };
-		E98A77132FE1032100E3A4F9 /* logodesign.icon in Resources */ = {isa = PBXBuildFile; fileRef = E98A77122FE1032100E3A4F9 /* logodesign.icon */; };
+		E98A77132FE1032100E3A4F9 /* Rev/logodesign.icon in Resources */ = {isa = PBXBuildFile; fileRef = E98A77122FE1032100E3A4F9 /* Rev/logodesign.icon */; };
 		FE6E01FCDAFF5997C0C16BE8 /* HomeDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */; };
 /* End PBXBuildFile section */
 
@@ -46,7 +46,7 @@
 		D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDrawer.swift; sourceTree = "<group>"; };
 		E9485FD72FD3DC9100975FC1 /* chicago-loop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-loop.gpx"; path = "../scripts/chicago-loop.gpx"; sourceTree = "<group>"; };
 		E9485FD82FD3E94F00975FC1 /* chicago-drive.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-drive.gpx"; path = "../scripts/chicago-drive.gpx"; sourceTree = "<group>"; };
-		E98A77122FE1032100E3A4F9 /* logodesign.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = logodesign.icon; sourceTree = "<group>"; };
+		E98A77122FE1032100E3A4F9 /* Rev/logodesign.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Rev/logodesign.icon; sourceTree = "<group>"; };
 		F23E45A1D168FC97A7B75918 /* TileDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDetailView.swift; sourceTree = "<group>"; };
 		FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerAvatar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -119,7 +119,7 @@
 				71FA7C28AE8D30D4F8AAF814 /* Packages */,
 				67C259D607CD7F162B12DE16 /* Rev */,
 				7232386AC9B9B6FFF0843CC7 /* Products */,
-				E98A77122FE1032100E3A4F9 /* logodesign.icon */,
+				E98A77122FE1032100E3A4F9 /* Rev/logodesign.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -153,7 +153,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2700;
 			};
 			buildConfigurationList = E5AAED5AF29484A42097BAAF /* Build configuration list for PBXProject "Rev" */;
 			developmentRegion = en;
@@ -183,7 +183,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1B3B3DF4CE62CE68F89D002 /* PrivacyInfo.xcprivacy in Resources */,
-				E98A77132FE1032100E3A4F9 /* logodesign.icon in Resources */,
+				E98A77132FE1032100E3A4F9 /* Rev/logodesign.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,9 +250,10 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G3G8GAV56Q;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -267,6 +268,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
@@ -309,9 +311,10 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = G3G8GAV56Q;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -333,6 +336,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
@@ -346,7 +350,6 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = G3G8GAV56Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
@@ -363,6 +366,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.driverev.Rev;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -376,7 +380,6 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = G3G8GAV56Q;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
@@ -393,6 +396,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.driverev.Rev;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
