@@ -47,7 +47,7 @@
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
 		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ScoringExplainerView.swift"; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoringExplainerView.swift; sourceTree = "<group>"; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
 		AC0673B770485F7009C4E40F /* ViewStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewStyles.swift; sourceTree = "<group>"; };
 		B1B3B3DF4CE62CE68F89D001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -117,7 +117,7 @@
 				A612DB066C3D529986584A8B /* RevApp.swift */,
 				32B76981DF5A715E1D4AC6D1 /* RootView.swift */,
 				F23E45A1D168FC97A7B75918 /* TileDetailView.swift */,
-				A1B2C3D4E5F60718293A4B5D /*  .swift */,
+				A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */,
 				AC0673B770485F7009C4E40F /* ViewStyles.swift */,
 			);
 			path = App;
@@ -222,7 +222,7 @@
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,
 				9422689350B941F2325CCDA5 /* RootView.swift in Sources */,
 				8C8F06F9CBBAC65E17612939 /* TileDetailView.swift in Sources */,
-				A1B2C3D4E5F60718293A4B5C /*  .swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* ScoringExplainerView.swift in Sources */,
 				CD9D182404C3D85F06D3425A /* ViewStyles.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -382,7 +382,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.driverev.Rev;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -412,7 +412,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.driverev.Rev;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
