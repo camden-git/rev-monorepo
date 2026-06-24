@@ -8,13 +8,14 @@ import (
 
 	"github.com/camden-git/rev-monorepo/backend/internal/game"
 	"github.com/camden-git/rev-monorepo/backend/internal/h3util"
+	"github.com/camden-git/rev-monorepo/backend/internal/notify"
 	"github.com/camden-git/rev-monorepo/backend/internal/stats"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
 // RegisterDriveHooks attaches the drive-resolution hook to the app
-func RegisterDriveHooks(app core.App) {
+func RegisterDriveHooks(app core.App, notifier notify.Notifier) {
 	app.OnRecordCreateRequest("drives").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := stampDriveOwner(e); err != nil {
 			return err
@@ -28,7 +29,7 @@ func RegisterDriveHooks(app core.App) {
 		// flips uploaded=true. the client reconciles tile state on the next delta-poll anyway.
 		// Also persist the failure on the drive so it is queryable/retryable
 		// rather than living only in the logs
-		if err := resolveDrive(e.App, e.Record); err != nil {
+		if err := resolveDrive(e.App, e.Record, notifier); err != nil {
 			e.App.Logger().Error("drive resolution failed", "drive", e.Record.Id, "error", err)
 			e.Record.Set("resolve_error", err.Error())
 			if saveErr := e.App.Save(e.Record); saveErr != nil {
@@ -57,7 +58,7 @@ type gpsSample struct {
 	Lng float64 `json:"lng"`
 }
 
-func resolveDrive(app core.App, drive *core.Record) error {
+func resolveDrive(app core.App, drive *core.Record, notifier notify.Notifier) error {
 	userID := drive.GetString("user")
 	if userID == "" {
 		return errors.New("drive has no user")
@@ -77,7 +78,11 @@ func resolveDrive(app core.App, drive *core.Record) error {
 	// TODO: re-derive per_tile_scores from raw_path via a ported TileScoring
 	// for anticheat
 
-	return app.RunInTransaction(func(txApp core.App) error {
+	// owners this drive displaced, tallied so each victim gets one aggregated
+	// push rather than one per tile. populated inside the transaction, dispatched
+	// only after it commits.
+	captures := map[string]int{}
+	err := app.RunInTransaction(func(txApp core.App) error {
 		// 1: per-tile direct resolution
 		claimedThisDrive := map[uint64]bool{}
 		strengths := map[string]float64{}
@@ -86,7 +91,7 @@ func resolveDrive(app core.App, drive *core.Record) error {
 			if err != nil {
 				continue // skip malformed keys rather than fail the whole drive
 			}
-			changed, strength, err := resolveTile(txApp, h3, userID, score, now)
+			changed, strength, capturedFrom, err := resolveTile(txApp, h3, userID, score, now)
 			if err != nil {
 				return err
 			}
@@ -94,16 +99,32 @@ func resolveDrive(app core.App, drive *core.Record) error {
 			if changed {
 				claimedThisDrive[h3] = true
 			}
+			if capturedFrom != "" {
+				captures[capturedFrom]++
+			}
 		}
 
 		// 2: enclosure flood-fill
-		if err := resolveEnclosure(txApp, drive, userID, rawPath, strengths, claimedThisDrive, now); err != nil {
+		if err := resolveEnclosure(txApp, drive, userID, rawPath, strengths, claimedThisDrive, now, captures); err != nil {
 			return err
 		}
-
-		// TODO: APNs silent push to affected owners
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	notifyCaptures(notifier, userID, captures)
+	return nil
+}
+
+// notifyCaptures raises one aggregated push per displaced owner.
+func notifyCaptures(notifier notify.Notifier, attackerID string, captures map[string]int) {
+	if notifier == nil {
+		return
+	}
+	for victimID, count := range captures {
+		notifier.TileCaptured(victimID, attackerID, count)
+	}
 }
 
 // ResolveDirectClaims applies a batch of direct per-tile claims for one user in a
@@ -111,27 +132,42 @@ func resolveDrive(app core.App, drive *core.Record) error {
 //
 // used by the live in-drive claim endpoint so captures broadcast over the `tiles`
 // realtime topic as they happen instead of only when the drive is uploaded
-func ResolveDirectClaims(app core.App, userID string, perTile map[string]float64, now time.Time) error {
+//
+// returns the owners this batch displaced (victim id -> tile count) so the live
+// claim route can push capture notifications as they happen. captures are
+// collected inside the transaction but only returned after it commits, so a
+// rolled-back batch raises nothing.
+func ResolveDirectClaims(app core.App, userID string, perTile map[string]float64, now time.Time) (map[string]int, error) {
 	if userID == "" {
-		return errors.New("claim batch has no user")
+		return nil, errors.New("claim batch has no user")
 	}
-	return app.RunInTransaction(func(txApp core.App) error {
+	captures := map[string]int{}
+	err := app.RunInTransaction(func(txApp core.App) error {
 		for h3str, score := range perTile {
 			h3, err := strconv.ParseUint(h3str, 10, 64)
 			if err != nil {
 				continue // skip malformed keys rather than fail the whole batch
 			}
-			if _, _, err := resolveTile(txApp, h3, userID, score, now); err != nil {
+			_, _, capturedFrom, err := resolveTile(txApp, h3, userID, score, now)
+			if err != nil {
 				return err
+			}
+			if capturedFrom != "" {
+				captures[capturedFrom]++
 			}
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return captures, nil
 }
 
 // resolveTile applies one direct raw-mph observation and reports whether the
-// ownership state changed plus the normalized claim strength used for comparison.
-func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now time.Time) (bool, float64, error) {
+// ownership state changed, the normalized claim strength used for comparison,
+// and the id of the owner displaced on a capture ("" when none).
+func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now time.Time) (bool, float64, string, error) {
 	h3str := strconv.FormatUint(h3, 10)
 	existing := findTile(txApp, h3str)
 
@@ -161,16 +197,16 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		if existing != nil {
 			setTileReference(existing, nextRef, nextObs)
 			if err := txApp.Save(existing); err != nil {
-				return false, strength, err
+				return false, strength, "", err
 			}
 		}
-		return false, strength, nil
+		return false, strength, "", nil
 
 	case game.Created:
 		if err := createTile(txApp, h3str, userID, outcome.Score, false, nextRef, nextObs, 0, now); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
-		return true, strength, nil
+		return true, strength, "", nil
 
 	case game.Reinforced:
 		setTileWindowParent(existing, h3)
@@ -178,11 +214,12 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
-		return true, strength, nil
+		return true, strength, "", nil
 
 	case game.Captured:
+		previousOwner := existing.GetString("owner")
 		captures := existing.GetInt("captures") + 1
 		setTileWindowParent(existing, h3)
 		setTileReference(existing, nextRef, nextObs)
@@ -191,15 +228,15 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		existing.Set("captures", captures)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
 		// append tile_history on ownership change
 		if err := appendHistory(txApp, h3str, userID, outcome.Score, now); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
-		return true, strength, nil
+		return true, strength, previousOwner, nil
 	}
-	return false, strength, nil
+	return false, strength, "", nil
 }
 
 // resolveEnclosure detects the loop the drive closed and claims its interior
@@ -216,6 +253,7 @@ func resolveEnclosure(
 	perTileStrengths map[string]float64,
 	claimedThisDrive map[uint64]bool,
 	now time.Time,
+	captures map[string]int,
 ) error {
 	points := make([]game.Point, len(rawPath))
 	for i, s := range rawPath {
@@ -252,14 +290,18 @@ func resolveEnclosure(
 		if score <= 0 || h3 == homeCell {
 			continue
 		}
-		if _, _, err := resolveStrengthTile(txApp, h3, userID, score, now); err != nil {
+		_, _, capturedFrom, err := resolveStrengthTile(txApp, h3, userID, score, now)
+		if err != nil {
 			return err
+		}
+		if capturedFrom != "" {
+			captures[capturedFrom]++
 		}
 	}
 	return nil
 }
 
-func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength float64, now time.Time) (bool, float64, error) {
+func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength float64, now time.Time) (bool, float64, string, error) {
 	h3str := strconv.FormatUint(h3, 10)
 	existing := findTile(txApp, h3str)
 
@@ -276,21 +318,22 @@ func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength floa
 	outcome := game.Resolve(current, userID, strength, now)
 	switch outcome.Kind {
 	case game.NoChange:
-		return false, strength, nil
+		return false, strength, "", nil
 	case game.Created:
 		if err := createTile(txApp, h3str, userID, outcome.Score, false, game.ReferenceSpeedPrior, 0, 0, now); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
-		return true, strength, nil
+		return true, strength, "", nil
 	case game.Reinforced:
 		setTileWindowParent(existing, h3)
 		existing.Set("claim_score", outcome.Score)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
-		return true, strength, nil
+		return true, strength, "", nil
 	case game.Captured:
+		previousOwner := existing.GetString("owner")
 		captures := existing.GetInt("captures") + 1
 		setTileWindowParent(existing, h3)
 		existing.Set("owner", userID)
@@ -298,14 +341,14 @@ func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength floa
 		existing.Set("captures", captures)
 		existing.Set("last_driven_at", now)
 		if err := txApp.Save(existing); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
 		if err := appendHistory(txApp, h3str, userID, outcome.Score, now); err != nil {
-			return false, strength, err
+			return false, strength, "", err
 		}
-		return true, strength, nil
+		return true, strength, previousOwner, nil
 	}
-	return false, strength, nil
+	return false, strength, "", nil
 }
 
 // MARK: helpers

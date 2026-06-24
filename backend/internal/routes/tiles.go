@@ -7,6 +7,7 @@ import (
 
 	"github.com/camden-git/rev-monorepo/backend/internal/h3util"
 	"github.com/camden-git/rev-monorepo/backend/internal/hooks"
+	"github.com/camden-git/rev-monorepo/backend/internal/notify"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -32,35 +33,44 @@ type tileClaimRequest struct {
 }
 
 // RegisterTileRoutes adds purpose-built map tile endpoints
-func RegisterTileRoutes(app core.App) {
+func RegisterTileRoutes(app core.App, notifier notify.Notifier) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		e.Router.POST("/api/rev/tiles/window", tileWindow).Bind(apis.RequireAuth("users"))
-		e.Router.POST("/api/rev/tiles/claim", tileClaim).Bind(apis.RequireAuth("users"))
+		e.Router.POST("/api/rev/tiles/claim", tileClaimHandler(notifier)).Bind(apis.RequireAuth("users"))
 		return e.Next()
 	})
 }
 
-// tileClaim resolves a batch of direct claims for the signed-in user mid-drive so
-// captured tiles broadcast live over the `tiles` realtime topic. enclosure is left
-// to the end-of-drive upload, which has the full raw trail
-func tileClaim(e *core.RequestEvent) error {
-	if e.Auth == nil {
-		return e.UnauthorizedError("Tile claims require a signed-in user.", nil)
-	}
-	var form tileClaimRequest
-	if err := e.BindBody(&form); err != nil {
-		return e.BadRequestError("invalid tile claim request.", err)
-	}
-	if len(form.PerTileScores) == 0 {
+// tileClaimHandler resolves a batch of direct claims for the signed-in user
+// mid-drive so captured tiles broadcast live over the `tiles` realtime topic.
+// enclosure is left to the end-of-drive upload, which has the full raw trail.
+// displaced owners are pushed a capture notification as it happens.
+func tileClaimHandler(notifier notify.Notifier) func(*core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if e.Auth == nil {
+			return e.UnauthorizedError("Tile claims require a signed-in user.", nil)
+		}
+		var form tileClaimRequest
+		if err := e.BindBody(&form); err != nil {
+			return e.BadRequestError("invalid tile claim request.", err)
+		}
+		if len(form.PerTileScores) == 0 {
+			return e.JSON(http.StatusOK, map[string]bool{"ok": true})
+		}
+		if len(form.PerTileScores) > maxClaimBatch {
+			return e.BadRequestError("tile claim batch is too large", nil)
+		}
+		captures, err := hooks.ResolveDirectClaims(e.App, e.Auth.Id, form.PerTileScores, time.Now())
+		if err != nil {
+			return e.InternalServerError("failed to resolve tile claims", err)
+		}
+		if notifier != nil {
+			for victimID, count := range captures {
+				notifier.TileCaptured(victimID, e.Auth.Id, count)
+			}
+		}
 		return e.JSON(http.StatusOK, map[string]bool{"ok": true})
 	}
-	if len(form.PerTileScores) > maxClaimBatch {
-		return e.BadRequestError("tile claim batch is too large", nil)
-	}
-	if err := hooks.ResolveDirectClaims(e.App, e.Auth.Id, form.PerTileScores, time.Now()); err != nil {
-		return e.InternalServerError("failed to resolve tile claims", err)
-	}
-	return e.JSON(http.StatusOK, map[string]bool{"ok": true})
 }
 
 func tileWindow(e *core.RequestEvent) error {
