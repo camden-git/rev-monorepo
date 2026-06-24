@@ -112,6 +112,26 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         lock.withLock { deleteAccountCount += 1 }
         try onDeleteAccount()
     }
+
+    func updatePrivacy(userId: String, isPrivate: Bool) async throws {}
+
+    func fetchProfile(userId: String) async throws -> ProfileDTO {
+        throw PocketBaseError.notAuthenticated
+    }
+
+    func fetchStats(userId: String) async throws -> [EmpireSnapshotDTO] { [] }
+
+    func fetchFeed() async throws -> [FeedItemDTO] { [] }
+
+    func listFollows() async throws -> [FollowRecordDTO] { [] }
+
+    func createFollow(followerId: String, followeeId: String) async throws -> FollowRecordDTO {
+        throw PocketBaseError.notAuthenticated
+    }
+
+    func acceptFollow(edgeId: String) async throws {}
+
+    func removeFollow(edgeId: String) async throws {}
 }
 
 // MARK: realtime mock

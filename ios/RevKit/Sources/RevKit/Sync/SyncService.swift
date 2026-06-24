@@ -338,6 +338,22 @@ public final class SyncService {
         }
     }
 
+    /// push the local player's private-account preference to their server record
+    @discardableResult
+    public func pushPrivacy(_ isPrivate: Bool) async -> Bool {
+        guard let userId = currentUserId else { return false }
+        do {
+            try await client.updatePrivacy(userId: userId, isPrivate: isPrivate)
+            lastError = nil
+            lastErrorKind = nil
+            lastDebugMessage = nil
+            return true
+        } catch {
+            recordSyncFailure(error, operation: "pushPrivacy")
+            return false
+        }
+    }
+
     public func signOut() {
         clearSession()
         lastError = nil

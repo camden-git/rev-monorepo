@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1A1A1A1A1A1A1A1A1A1A1A01 /* PlayerProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B01 /* PlayerProfileView.swift */; };
+		1A1A1A1A1A1A1A1A1A1A1A02 /* EmpireStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B02 /* EmpireStatsView.swift */; };
+		1A1A1A1A1A1A1A1A1A1A1A03 /* SocialViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2B2B2B2B2B2B2B2B2B2B03 /* SocialViews.swift */; };
 		119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A612DB066C3D529986584A8B /* RevApp.swift */; };
 		2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F692E402518C09F1A7976B /* ProfileHubView.swift */; };
 		39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */; };
@@ -27,6 +30,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2B2B2B2B2B2B2B2B2B2B2B01 /* PlayerProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProfileView.swift; sourceTree = "<group>"; };
+		2B2B2B2B2B2B2B2B2B2B2B02 /* EmpireStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmpireStatsView.swift; sourceTree = "<group>"; };
+		2B2B2B2B2B2B2B2B2B2B2B03 /* SocialViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialViews.swift; sourceTree = "<group>"; };
 		10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryView.swift; sourceTree = "<group>"; };
 		136227412603B5999AB44748 /* ProfileSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsView.swift; sourceTree = "<group>"; };
 		14FDC10F6072E934167CD1D7 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
@@ -101,6 +107,9 @@
 				40C0F969107087F96013E67F /* LeaderboardView.swift */,
 				15713F2A44FA62B340F54D44 /* OnboardingView.swift */,
 				FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */,
+				2B2B2B2B2B2B2B2B2B2B2B01 /* PlayerProfileView.swift */,
+				2B2B2B2B2B2B2B2B2B2B2B02 /* EmpireStatsView.swift */,
+				2B2B2B2B2B2B2B2B2B2B2B03 /* SocialViews.swift */,
 				30F692E402518C09F1A7976B /* ProfileHubView.swift */,
 				136227412603B5999AB44748 /* ProfileSettingsView.swift */,
 				A612DB066C3D529986584A8B /* RevApp.swift */,
@@ -202,6 +211,9 @@
 				50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */,
 				93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */,
 				BD993042EE13D451121A04CD /* PlayerAvatar.swift in Sources */,
+				1A1A1A1A1A1A1A1A1A1A1A01 /* PlayerProfileView.swift in Sources */,
+				1A1A1A1A1A1A1A1A1A1A1A02 /* EmpireStatsView.swift in Sources */,
+				1A1A1A1A1A1A1A1A1A1A1A03 /* SocialViews.swift in Sources */,
 				2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */,
 				76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */,
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,

@@ -120,6 +120,56 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         _ = try await send(request, decoding: PlayerDTO.self)
     }
 
+    public func updatePrivacy(userId: String, isPrivate: Bool) async throws {
+        var request = try makeRequest(path: "/api/collections/users/records/\(userId)", method: "PATCH", authed: true)
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["is_private": isPrivate])
+        try await send(request)
+    }
+
+    public func fetchProfile(userId: String) async throws -> ProfileDTO {
+        let request = try makeRequest(path: "/api/rev/profile/\(userId)", method: "GET", authed: true)
+        return try await send(request, decoding: ProfileDTO.self)
+    }
+
+    public func fetchStats(userId: String) async throws -> [EmpireSnapshotDTO] {
+        let request = try makeRequest(path: "/api/rev/profile/\(userId)/stats", method: "GET", authed: true)
+        return try await send(request, decoding: StatsResponse.self).items
+    }
+
+    public func fetchFeed() async throws -> [FeedItemDTO] {
+        let request = try makeRequest(path: "/api/rev/feed", method: "GET", authed: true)
+        return try await send(request, decoding: FeedResponse.self).items
+    }
+
+    public func listFollows() async throws -> [FollowRecordDTO] {
+        let query = [
+            URLQueryItem(name: "perPage", value: "200"),
+            URLQueryItem(name: "expand", value: "follower,followee"),
+        ]
+        let request = try makeRequest(path: "/api/collections/follows/records", method: "GET", authed: true, query: query)
+        return try await send(request, decoding: ListResponse<FollowRecordDTO>.self).items
+    }
+
+    public func createFollow(followerId: String, followeeId: String) async throws -> FollowRecordDTO {
+        var request = try makeRequest(path: "/api/collections/follows/records", method: "POST", authed: true)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "follower": followerId,
+            "followee": followeeId,
+        ])
+        return try await send(request, decoding: FollowRecordDTO.self)
+    }
+
+    public func acceptFollow(edgeId: String) async throws {
+        var request = try makeRequest(path: "/api/collections/follows/records/\(edgeId)", method: "PATCH", authed: true)
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["status": "accepted"])
+        try await send(request)
+    }
+
+    public func removeFollow(edgeId: String) async throws {
+        let request = try makeRequest(path: "/api/collections/follows/records/\(edgeId)", method: "DELETE", authed: true)
+        try await send(request)
+    }
+
     public func deleteAccount() async throws {
         let request = try makeRequest(path: "/api/rev/account/delete", method: "POST", authed: true)
         _ = try await send(request, decoding: TileClaimResponse.self) // `{ "ok": true }`
@@ -142,6 +192,17 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
             request.setValue(token, forHTTPHeaderField: "Authorization")
         }
         return request
+    }
+
+    /// send a request that returns no body we care about (PATCH/DELETE), failing
+    /// on a non-2xx the same way the decoding variant does
+    private func send(_ request: URLRequest) async throws {
+        let (data, http) = try await transport.send(request)
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data.prefix(2048), encoding: .utf8) ?? ""
+            logFailure(request: request, status: http.statusCode, detail: body)
+            throw PocketBaseError.http(status: http.statusCode, body: body)
+        }
     }
 
     private func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type) async throws -> T {

@@ -10,6 +10,8 @@ struct RootView: View {
     @State private var signIn: AppleSignInCoordinator
     /// backend sync
     @State private var sync: SyncService
+    /// follow graph + activity feed
+    @State private var social: SocialService
 
     /// the post-drive recap surfaces first as a toast, which expands to the full sheet
     @State private var showToast = false
@@ -40,6 +42,7 @@ struct RootView: View {
         let client = URLSessionPocketBaseClient(config: config, tokenStore: tokenStore)
         _signIn = State(initialValue: AppleSignInCoordinator(client: client, tokenStore: tokenStore))
         _sync = State(initialValue: SyncService(store: store, context: context, config: config, tokenStore: tokenStore))
+        _social = State(initialValue: SocialService(client: client))
     }
 
     var body: some View {
@@ -53,10 +56,22 @@ struct RootView: View {
         .task {
             await sync.restoreSessionIfPossible()
             reconcileRealtime()
+            await refreshSocial()
         }
         // keep the live tile stream open only while the app is active and signed in
         .onChange(of: scenePhase) { _, _ in reconcileRealtime() }
-        .onChange(of: sync.isSignedIn) { _, _ in reconcileRealtime() }
+        .onChange(of: sync.isSignedIn) { _, _ in
+            reconcileRealtime()
+            Task { await refreshSocial() }
+        }
+    }
+
+    private func refreshSocial() async {
+        if let userId = sync.currentUserId {
+            await social.refresh(viewerId: userId)
+        } else {
+            social.clear()
+        }
     }
 
     private func reconcileRealtime() {
@@ -105,6 +120,7 @@ struct RootView: View {
                     tracker: tracker,
                     signIn: signIn,
                     sync: sync,
+                    social: social,
                     selectedTile: $selectedTile,
                     showSummary: $showSummary
                 )

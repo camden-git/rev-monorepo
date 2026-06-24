@@ -7,6 +7,7 @@ import SwiftUI
 struct ProfileHubView: View {
     let store: TerritoryStore
     let sync: SyncService
+    let social: SocialService
     let signIn: AppleSignInCoordinator
     var onDone: () -> Void = {}
 
@@ -29,9 +30,11 @@ struct ProfileHubView: View {
                     }
                 }
 
+                socialSection
+
                 Section {
                     NavigationLink {
-                        ProfileSettingsView(store: store, sync: sync, embedded: true)
+                        ProfileSettingsView(store: store, sync: sync, social: social, embedded: true)
                     } label: {
                         Label("Edit Profile", systemImage: "pencil")
                     }
@@ -78,6 +81,45 @@ struct ProfileHubView: View {
                 SessionRecoveryView(signIn: signIn, sync: sync) { showSignIn = false }
                     .presentationDetents([.height(420), .medium])
                     .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var socialSection: some View {
+        if sync.isSignedIn, let userId = sync.currentUserId {
+            Section("Social") {
+                NavigationLink {
+                    ActivityFeedView(store: store, social: social, embedded: true)
+                } label: {
+                    Label("Activity Feed", systemImage: "figure.run")
+                }
+                NavigationLink {
+                    FollowListView(store: store, social: social, embedded: true)
+                } label: {
+                    HStack {
+                        Label("Friends", systemImage: "person.2.fill")
+                        if social.incomingRequestCount > 0 {
+                            Spacer()
+                            Text("\(social.incomingRequestCount)")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(.red, in: Capsule())
+                        }
+                    }
+                }
+                NavigationLink {
+                    FindPeopleView(store: store, social: social, sync: sync, embedded: true)
+                } label: {
+                    Label("Find People", systemImage: "magnifyingglass")
+                }
+                NavigationLink {
+                    EmpireStatsView(social: social, userId: userId, title: "My", embedded: true)
+                } label: {
+                    Label("My Stats Over Time", systemImage: "chart.xyaxis.line")
+                }
             }
         }
     }

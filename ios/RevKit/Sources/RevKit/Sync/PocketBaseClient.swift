@@ -40,6 +40,38 @@ public protocol PocketBaseClient: Sendable {
     /// `PATCH /api/collections/users/records/{userId}`
     func updateProfile(userId: String, homeH3: UInt64, color: String, displayName: String) async throws
 
+    /// flip the signed-in user's private-account flag
+    /// `PATCH /api/collections/users/records/{userId}`
+    func updatePrivacy(userId: String, isPrivate: Bool) async throws
+
+    /// fetch a player's profile, current standing, and relationship
+    /// `GET /api/rev/profile/{userId}`
+    func fetchProfile(userId: String) async throws -> ProfileDTO
+
+    /// fetch a player's empire-over-time series
+    /// `GET /api/rev/profile/{userId}/stats`
+    func fetchStats(userId: String) async throws -> [EmpireSnapshotDTO]
+
+    /// recent drives from the people the signed-in user follows
+    /// `GET /api/rev/feed`
+    func fetchFeed() async throws -> [FeedItemDTO]
+
+    /// every follow edge the signed-in user is part of, players expanded
+    /// `GET /api/collections/follows/records`
+    func listFollows() async throws -> [FollowRecordDTO]
+
+    /// follow a player (auto-accepted unless they are private)
+    /// `POST /api/collections/follows/records`
+    func createFollow(followerId: String, followeeId: String) async throws -> FollowRecordDTO
+
+    /// accept a pending follow request aimed at the signed-in user
+    /// `PATCH /api/collections/follows/records/{edgeId}`
+    func acceptFollow(edgeId: String) async throws
+
+    /// drop a follow edge (unfollow, cancel a request, or remove a follower)
+    /// `DELETE /api/collections/follows/records/{edgeId}`
+    func removeFollow(edgeId: String) async throws
+
     /// permanently delete the signed-in user and everything tied to them
     /// `POST /api/rev/account/delete`
     func deleteAccount() async throws

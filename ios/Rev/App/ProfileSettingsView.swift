@@ -6,6 +6,7 @@ import UIKit
 struct ProfileSettingsView: View {
     let store: TerritoryStore
     let sync: SyncService
+    let social: SocialService
     /// when pushed inside the profile hub, drop the wrapping stack + Cancel button
     /// (the hub's navigation bar back button serves as cancel)
     var embedded = false
@@ -15,17 +16,21 @@ struct ProfileSettingsView: View {
 
     @State private var name: String
     @State private var colorHex: String
+    @State private var isPrivate = false
+    @State private var privacyLoaded = false
     @State private var isSaving = false
     @State private var saveError: String?
 
     init(
         store: TerritoryStore,
         sync: SyncService,
+        social: SocialService,
         embedded: Bool = false,
         onDone: @escaping () -> Void = {}
     ) {
         self.store = store
         self.sync = sync
+        self.social = social
         self.embedded = embedded
         self.onDone = onDone
         _name = State(initialValue: store.localPlayer.displayName)
@@ -43,6 +48,7 @@ struct ProfileSettingsView: View {
             form
                 .navigationTitle("Edit Profile")
                 .navigationBarTitleDisplayMode(.inline)
+                .task { await loadPrivacy() }
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) { saveButton }
                 }
@@ -51,6 +57,7 @@ struct ProfileSettingsView: View {
                 form
                     .navigationTitle("Profile")
                     .navigationBarTitleDisplayMode(.inline)
+                    .task { await loadPrivacy() }
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Cancel", action: onDone)
@@ -60,6 +67,14 @@ struct ProfileSettingsView: View {
                     }
             }
         }
+    }
+
+    private func loadPrivacy() async {
+        guard sync.isSignedIn, !privacyLoaded, let id = sync.currentUserId else { return }
+        if let profile = await social.profile(id) {
+            isPrivate = profile.isPrivate
+        }
+        privacyLoaded = true
     }
 
     private var form: some View {
@@ -83,6 +98,16 @@ struct ProfileSettingsView: View {
                     }
                 }
                 .padding(.vertical, 8)
+            }
+
+            if sync.isSignedIn {
+                Section {
+                    Toggle(isOn: $isPrivate) {
+                        Label("Private Account", systemImage: "lock.fill")
+                    }
+                } footer: {
+                    Text("When your account is private, new followers need your approval and only accepted followers can see your drives and stats. Your territory always stays visible on the map.")
+                }
             }
 
             if let saveError {
@@ -157,6 +182,9 @@ struct ProfileSettingsView: View {
 
         isSaving = true
         let didSave = await sync.pushProfile()
+        if didSave {
+            await sync.pushPrivacy(isPrivate)
+        }
         isSaving = false
 
         if didSave {

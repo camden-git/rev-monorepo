@@ -8,6 +8,7 @@ import (
 
 	"github.com/camden-git/rev-monorepo/backend/internal/game"
 	"github.com/camden-git/rev-monorepo/backend/internal/h3util"
+	"github.com/camden-git/rev-monorepo/backend/internal/stats"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -33,6 +34,10 @@ func RegisterDriveHooks(app core.App) {
 			if saveErr := e.App.Save(e.Record); saveErr != nil {
 				e.App.Logger().Error("failed to record drive resolve_error", "drive", e.Record.Id, "error", saveErr)
 			}
+		}
+		// fold the new territory into the driver's stat history
+		if err := stats.SnapshotUser(e.App, e.Record.GetString("user"), time.Now()); err != nil {
+			e.App.Logger().Error("post-drive snapshot failed", "drive", e.Record.Id, "error", err)
 		}
 		return e.Next()
 	})

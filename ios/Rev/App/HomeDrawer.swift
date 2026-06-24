@@ -7,7 +7,8 @@ struct HomeDrawer: View {
     let tracker: DriveTracker
     let signIn: AppleSignInCoordinator
     let sync: SyncService
-    
+    let social: SocialService
+
     @Binding var selectedTile: HexTileDetail?
     @Binding var showSummary: Bool
 
@@ -79,7 +80,7 @@ struct HomeDrawer: View {
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileHubView(store: store, sync: sync, signIn: signIn) { showProfile = false }
+            ProfileHubView(store: store, sync: sync, social: social, signIn: signIn) { showProfile = false }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -185,7 +186,7 @@ struct HomeDrawer: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Leaderboard") {
-                LeaderboardView(store: store, embedded: true)
+                LeaderboardView(store: store, social: social, embedded: true)
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {

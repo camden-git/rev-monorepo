@@ -6,6 +6,7 @@ import SwiftUI
 /// ranking uses Score Metric v2's value-weighted empire score
 struct LeaderboardView: View {
     let store: TerritoryStore
+    let social: SocialService
     /// when pushed inside a hub/drawer, drop the wrapping stack + Done button
     var embedded = false
     var onDone: () -> Void = {}
@@ -30,8 +31,18 @@ struct LeaderboardView: View {
     private var list: some View {
         List {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                row(rank: index + 1, entry: entry)
-                    .listRowBackground(entry.isLocal ? Color.blue.opacity(0.12) : nil)
+                NavigationLink {
+                    PlayerProfileView(
+                        store: store,
+                        social: social,
+                        userId: entry.playerId,
+                        fallbackName: entry.displayName,
+                        fallbackColor: entry.colorHex
+                    )
+                } label: {
+                    row(rank: index + 1, entry: entry)
+                }
+                .listRowBackground(entry.isLocal ? Color.blue.opacity(0.12) : nil)
             }
         }
         .navigationTitle("Leaderboard")

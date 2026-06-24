@@ -10,6 +10,7 @@ import (
 
 	"github.com/camden-git/rev-monorepo/backend/internal/hooks"
 	"github.com/camden-git/rev-monorepo/backend/internal/routes"
+	"github.com/camden-git/rev-monorepo/backend/internal/stats"
 
 	_ "github.com/camden-git/rev-monorepo/backend/migrations"
 )
@@ -23,9 +24,12 @@ func main() {
 
 	hooks.RegisterDriveHooks(app)
 	hooks.RegisterUserHooks(app)
+	hooks.RegisterFollowHooks(app)
 	routes.RegisterInviteAuthRoutes(app)
 	routes.RegisterTileRoutes(app)
 	routes.RegisterAccountRoutes(app)
+	routes.RegisterSocialRoutes(app)
+	stats.RegisterSnapshotCron(app)
 
 	// local dev stuff
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
