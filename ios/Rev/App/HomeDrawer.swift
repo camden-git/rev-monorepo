@@ -35,8 +35,8 @@ struct HomeDrawer: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $selectedTile) { tile in
                 TileDetailView(detail: tile) { selectedTile = nil }
-                    .presentationDetents([.height(340), .medium])
-                    .presentationBackgroundInteraction(.enabled(upThrough: .height(340)))
+                    .presentationDetents([.medium, .large])
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationDragIndicator(.visible)
             }
         }

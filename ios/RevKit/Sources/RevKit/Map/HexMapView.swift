@@ -16,6 +16,10 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
     /// the score it was last claimed at, before decay
     public let claimScore: Double?
     public let lastDrivenAt: Date?
+    /// the road's learned "typical pace" in mph
+    public let refSpeed: Double?
+    /// how many drives have taught us this road's typical pace
+    public let obsCount: Int?
 
     public var isClaimed: Bool { ownerName != nil }
 
@@ -27,7 +31,9 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
         isHome: Bool,
         effectiveScore: Double?,
         claimScore: Double?,
-        lastDrivenAt: Date?
+        lastDrivenAt: Date?,
+        refSpeed: Double? = nil,
+        obsCount: Int? = nil
     ) {
         self.id = id
         self.ownerName = ownerName
@@ -37,6 +43,8 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
         self.effectiveScore = effectiveScore
         self.claimScore = claimScore
         self.lastDrivenAt = lastDrivenAt
+        self.refSpeed = refSpeed
+        self.obsCount = obsCount
     }
 }
 
@@ -388,7 +396,9 @@ public struct HexMapView: UIViewRepresentable {
                     isHome: state.isHome,
                     effectiveScore: store.effectiveScore(of: cell.id),
                     claimScore: state.claimScore,
-                    lastDrivenAt: state.lastDrivenAt
+                    lastDrivenAt: state.lastDrivenAt,
+                    refSpeed: state.refSpeed,
+                    obsCount: state.obsCount
                 )
             } else {
                 detail = HexTileDetail(

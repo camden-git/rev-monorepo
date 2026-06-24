@@ -6,33 +6,49 @@ struct TileDetailView: View {
     let detail: HexTileDetail
     var onDone: () -> Void = {}
 
+    @State private var showExplainer = false
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 24) {
-                identity
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    identity
 
-                if detail.isHome {
-                    homeNote
-                    metadata
-                } else if detail.isClaimed {
-                    if let strength = detail.effectiveScore {
-                        strengthBlock(strength)
+                    if detail.isHome {
+                        homeNote
+                        metadata
+                    } else if detail.isClaimed {
+                        if let strength = detail.effectiveScore {
+                            strengthBlock(strength)
+                            paceBreakdown(strength: strength)
+                        }
+                        metadata
+                    } else {
+                        unclaimedHint
+                        if hasTypicalPace { typicalPaceHint }
                     }
-                    metadata
-                } else {
-                    unclaimedHint
                 }
-
-                Spacer(minLength: 0)
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .navigationTitle("Tile")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showExplainer = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                    .accessibilityLabel("How scoring works")
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", action: onDone)
                 }
+            }
+            .sheet(isPresented: $showExplainer) {
+                ScoringExplainerView(onDone: { showExplainer = false })
+                    .presentationDetents([.large])
             }
         }
     }
@@ -97,7 +113,7 @@ struct TileDetailView: View {
     private func strengthBlock(_ strength: Double) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(String(format: "%.1f", strength))
+                Text(String(format: "%.1f×", asMultiple(strength)))
                     .font(.system(size: 44, weight: .bold, design: .rounded))
                     .monospacedDigit()
                 Text("strength")
@@ -114,15 +130,20 @@ struct TileDetailView: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
+    /// stored scores come in two scales
+    private func asMultiple(_ score: Double) -> Double {
+        score > Strength.strengthCap ? score / referencePace : score
+    }
+
     /// decay has pulled the effective score meaningfully below the claim score
     private var isFading: Bool {
         guard let claim = detail.claimScore, let effective = detail.effectiveScore else { return false }
-        return claim - effective >= 1
+        return asMultiple(claim) - asMultiple(effective) >= 0.1
     }
 
     /// caption under the strength
     private var strengthCaption: String {
-        let fadingFrom = detail.claimScore.map { String(format: "Fading from %.1f", $0) }
+        let fadingFrom = detail.claimScore.map { String(format: "Fading from %.1f×", asMultiple($0)) }
         if detail.isLocalOwner {
             if let fadingFrom, isFading { return "\(fadingFrom), drive it to refresh" }
             return "Holding strong"
@@ -130,6 +151,159 @@ struct TileDetailView: View {
             if let fadingFrom, isFading { return "\(fadingFrom), easier to take" }
             return "Beat this strength to take it"
         }
+    }
+
+    // MARK: pace breakdown
+
+    /// do we actually know this road's typical pace yet?
+    private var hasTypicalPace: Bool {
+        guard let ref = detail.refSpeed, ref > 0 else { return false }
+        return (detail.obsCount ?? 0) >= 1
+    }
+
+    /// the reference ("usual") pace we score against
+    private var referencePace: Double {
+        if let ref = detail.refSpeed, ref > 0 { return ref }
+        return Strength.referenceSpeedPrior
+    }
+
+    /// true while we're still using the fallback prior (road not driven enough)
+    private var referenceIsEstimated: Bool {
+        !hasTypicalPace
+    }
+
+    /// the score the tile was claimed at (decayed value as a last resort)
+    private var claimMultiple: Double? {
+        detail.claimScore ?? detail.effectiveScore
+    }
+
+    /// reconstruct driven mph + the multiple-of-usual-pace from the stored score,
+    private var paceReconstruction: (drove: Double, multiple: Double)? {
+        guard let score = claimMultiple, score > 0 else { return nil }
+        let ref = referencePace
+        if score > Strength.strengthCap {
+            return (drove: score, multiple: score / ref)
+        }
+        return (drove: score * ref, multiple: score)
+    }
+
+    /// visual breakdown of how strength was earned
+    /// strength is the multiple of the road's usual pace that was driven
+    @ViewBuilder
+    private func paceBreakdown(strength: Double) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("How this was scored", systemImage: "speedometer")
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 8)
+                Button("Learn more") { showExplainer = true }
+                    .font(.footnote.weight(.medium))
+                    .buttonStyle(.borderless)
+            }
+
+            if let recon = paceReconstruction {
+                HStack(alignment: .top, spacing: 0) {
+                    paceStat(
+                        label: referenceIsEstimated ? "Usual pace (est.)" : "Usual pace here",
+                        value: "≈\(Int(referencePace.rounded())) mph"
+                    )
+                    Divider().frame(height: 34)
+                    paceStat(label: "This claim drove", value: "≈\(Int(recon.drove.rounded())) mph")
+                }
+
+                paceBar(multiple: recon.multiple)
+
+                Text(breakdownSentence(multiple: recon.multiple))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if referenceIsEstimated {
+                    Text("This road's usual pace is temporarily estimated.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Text("Strength is how far a drive beats this road's usual pace.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func paceStat(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.weight(.semibold).monospacedDigit())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 2)
+    }
+
+    /// comparison bar
+    private func paceBar(multiple: Double) -> some View {
+        let scaleMax = max(2.0, multiple.rounded(.up))
+        let fill = min(max(multiple, 0) / scaleMax, 1)
+        let typicalX = 1.0 / scaleMax
+        let beatsTypical = multiple >= 1
+
+        return VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.quaternary)
+                        .frame(height: 12)
+                    Capsule()
+                        .fill(beatsTypical ? Color.green : Color.orange)
+                        .frame(width: max(8, w * fill), height: 12)
+                    // "usual pace" tick
+                    Rectangle()
+                        .fill(.primary.opacity(0.6))
+                        .frame(width: 2, height: 20)
+                        .offset(x: w * typicalX - 1)
+                }
+                .frame(height: 20)
+            }
+            .frame(height: 20)
+
+            HStack(spacing: 4) {
+                Rectangle()
+                    .fill(.primary.opacity(0.6))
+                    .frame(width: 2, height: 9)
+                Text("usual pace (1×)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text(String(format: "%.1f× the usual pace", multiple))
+                    .font(.caption2.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(beatsTypical ? Color.green : Color.orange)
+            }
+        }
+    }
+
+    private func breakdownSentence(multiple: Double) -> String {
+        let m = String(format: "%.1f×", multiple)
+        if multiple >= 1 {
+            return "Driven about \(m) this road's usual pace. Beating the pace is what earns strength."
+        }
+        return "Driven about \(m) this road's usual pace. Strength comes from beating the local pace, so faster-than-usual drives score higher."
+    }
+
+    /// shown on unclaimed tiles that already have a learned pace
+    private var typicalPaceHint: some View {
+        Label(
+            "This road usually runs ≈\(Int((detail.refSpeed ?? 0).rounded())) mph. Beat that pace to claim more points.",
+            systemImage: "speedometer"
+        )
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
     }
 
     // MARK: metadata
@@ -180,19 +354,40 @@ struct TileDetailView: View {
             ownerColorHex: "#EF4444",
             isLocalOwner: false,
             isHome: false,
-            effectiveScore: 42,
-            claimScore: 51,
-            lastDrivenAt: .now.addingTimeInterval(-3 * 86_400)
+            effectiveScore: 1.6,
+            claimScore: 1.9,
+            lastDrivenAt: .now.addingTimeInterval(-3 * 86_400),
+            refSpeed: 18,
+            obsCount: 7
         ))
-        .presentationDetents([.height(340), .medium])
+        .presentationDetents([.medium, .large])
     }
 }
 
-#Preview("Unclaimed") {
+#Preview("Your tile, legacy data") {
+    Color.gray.sheet(isPresented: .constant(true)) {
+        TileDetailView(detail: HexTileDetail(
+            id: 3,
+            ownerName: "Camden",
+            ownerColorHex: "#3B82F6",
+            isLocalOwner: true,
+            isHome: false,
+            effectiveScore: 63.6,
+            claimScore: 65.5,
+            lastDrivenAt: .now.addingTimeInterval(-5 * 3600),
+            refSpeed: nil,
+            obsCount: nil
+        ))
+        .presentationDetents([.medium, .large])
+    }
+}
+
+#Preview("Unclaimed, known pace") {
     Color.gray.sheet(isPresented: .constant(true)) {
         TileDetailView(detail: HexTileDetail(
             id: 2, ownerName: nil, ownerColorHex: nil, isLocalOwner: false,
-            isHome: false, effectiveScore: nil, claimScore: nil, lastDrivenAt: nil
+            isHome: false, effectiveScore: nil, claimScore: nil, lastDrivenAt: nil,
+            refSpeed: 30, obsCount: 4
         ))
         .presentationDetents([.height(340), .medium])
     }

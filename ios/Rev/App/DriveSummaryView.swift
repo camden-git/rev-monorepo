@@ -12,6 +12,8 @@ struct DriveSummaryView: View {
     let store: TerritoryStore
     var onDone: () -> Void = {}
 
+    @State private var showExplainer = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -47,7 +49,21 @@ struct DriveSummaryView: View {
                     }
                 }
 
-                Section { metricsRow }
+                Section {
+                    metricsRow
+                } footer: {
+                    Button {
+                        showExplainer = true
+                    } label: {
+                        Label("How tiles are scored", systemImage: "questionmark.circle")
+                            .font(.footnote)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            .sheet(isPresented: $showExplainer) {
+                ScoringExplainerView(onDone: { showExplainer = false })
+                    .presentationDetents([.large])
             }
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
