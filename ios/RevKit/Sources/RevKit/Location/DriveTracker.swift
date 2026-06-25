@@ -36,6 +36,10 @@ public final class DriveTracker {
         currentDrive?.rawPath.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) } ?? []
     }
 
+    public var drivePathSegments: [[CLLocationCoordinate2D]] {
+        TileScoring.segmentedPath(currentDrive?.rawPath ?? [])
+    }
+
     /// live count of tiles gained this drive
     public var claimsThisDrive: Int {
         let me = store.localPlayer.id

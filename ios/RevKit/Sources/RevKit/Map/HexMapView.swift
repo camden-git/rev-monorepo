@@ -55,13 +55,13 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
 /// MapKit map with the H3 res-10 grid overlay
 public struct HexMapView: UIViewRepresentable {
     private let store: TerritoryStore
-    private let breadcrumb: [CLLocationCoordinate2D]
+    private let breadcrumb: [[CLLocationCoordinate2D]]
     private let onVisibleCellsChange: @MainActor (Set<UInt64>) -> Void
     private let onSelectTile: @MainActor (HexTileDetail) -> Void
 
     public init(
         store: TerritoryStore,
-        breadcrumb: [CLLocationCoordinate2D] = [],
+        breadcrumb: [[CLLocationCoordinate2D]] = [],
         onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void = { _ in },
         onSelectTile: @escaping @MainActor (HexTileDetail) -> Void = { _ in }
     ) {
@@ -132,7 +132,7 @@ public struct HexMapView: UIViewRepresentable {
         private var visibleClaimCells: Set<UInt64> = []
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
-        private var breadcrumbOverlay: MKPolyline?
+        private var breadcrumbOverlays: [MKPolyline] = []
         private var breadcrumbCount = 0
         private var claimedOverlaySignature: ClaimedOverlaySignature?
         private var didCenterOnUser = false
@@ -321,20 +321,23 @@ public struct HexMapView: UIViewRepresentable {
             return cellsByOwner
         }
 
-        func syncBreadcrumb(_ coordinates: [CLLocationCoordinate2D]) {
+        func syncBreadcrumb(_ segments: [[CLLocationCoordinate2D]]) {
             guard let mapView else { return }
             // updateUIView fires ~1 Hz during a drive (speed/state changes); only rebuild the
-            // polyline when the path actually grew, otherwise we redraw the whole line for nothing
-            guard coordinates.count != breadcrumbCount else { return }
-            breadcrumbCount = coordinates.count
-            if let breadcrumbOverlay { mapView.removeOverlay(breadcrumbOverlay) }
-            guard coordinates.count > 1 else {
-                breadcrumbOverlay = nil
-                return
+            // polylines when the path actually grew, otherwise we redraw the whole trail for nothing
+            let total = segments.reduce(0) { $0 + $1.count }
+            guard total != breadcrumbCount else { return }
+            breadcrumbCount = total
+            if !breadcrumbOverlays.isEmpty {
+                mapView.removeOverlays(breadcrumbOverlays)
+                breadcrumbOverlays = []
             }
-            let line = MKPolyline(coordinates: coordinates, count: coordinates.count)
-            breadcrumbOverlay = line
-            mapView.addOverlay(line)
+
+            for segment in segments where segment.count > 1 {
+                let line = MKPolyline(coordinates: segment, count: segment.count)
+                breadcrumbOverlays.append(line)
+                mapView.addOverlay(line)
+            }
         }
 
         @MainActor

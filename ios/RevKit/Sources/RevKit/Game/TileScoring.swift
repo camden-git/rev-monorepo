@@ -16,6 +16,10 @@ public enum TileScoring {
     /// segments slower than this count as "stopped"
     static let stoppedSpeedMetersPerSecond = 2.0 / mphPerMetersPerSecond
 
+    /// max time between consecutive fixes before a segment is treated as a tracking gap rather than
+    /// real travel
+    public static let maxSegmentGap: TimeInterval = 10
+
     /// target length (m) of each sub-step a segment is broken into for tile attribution. small
     /// relative to a res-10 hex (~130 m wide) so a segment is credited to each tile in proportion
     /// to how much of it actually lies inside that tile.
@@ -38,7 +42,7 @@ public enum TileScoring {
 
         for (a, b) in zip(samples, samples.dropFirst()) {
             let dt = b.timestamp.timeIntervalSince(a.timestamp)
-            guard dt > 0 else { continue }
+            guard dt > 0, dt <= maxSegmentGap else { continue }
 
             let distance = GPSOutlierFilter.distanceMeters(a, b)
             let segmentSpeed = distance / dt
@@ -77,7 +81,7 @@ public enum TileScoring {
         var totalMovingTime = 0.0
         for (a, b) in zip(samples, samples.dropFirst()) {
             let dt = b.timestamp.timeIntervalSince(a.timestamp)
-            guard dt > 0 else { continue }
+            guard dt > 0, dt <= maxSegmentGap else { continue }
 
             let distance = GPSOutlierFilter.distanceMeters(a, b)
             let segmentSpeed = distance / dt
@@ -99,6 +103,25 @@ public enum TileScoring {
             if seen.insert(tile).inserted { ordered.append(tile) }
         }
         return ordered
+    }
+
+    /// split a raw path into continuous breadcrumb segments, breaking wherever the gap between
+    /// fixes exceeds `maxSegmentGap` (the app was suspended and we don't know the route taken). the
+    /// map draws one polyline per segment so a gap stays a gap instead of a false straight line.
+    public static func segmentedPath(_ path: [GPSSample]) -> [[CLLocationCoordinate2D]] {
+        var segments: [[CLLocationCoordinate2D]] = []
+        var current: [CLLocationCoordinate2D] = []
+        var previous: Date?
+        for sample in path {
+            if let previous, sample.timestamp.timeIntervalSince(previous) > maxSegmentGap {
+                segments.append(current)
+                current = []
+            }
+            current.append(CLLocationCoordinate2D(latitude: sample.lat, longitude: sample.lng))
+            previous = sample.timestamp
+        }
+        if !current.isEmpty { segments.append(current) }
+        return segments
     }
 
     static func cell(lat: Double, lng: Double) -> UInt64? {

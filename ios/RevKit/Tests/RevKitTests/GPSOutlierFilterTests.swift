@@ -60,4 +60,41 @@ struct GPSOutlierFilterTests {
         #expect(spiked < 50)
         #expect(spiked > 10)
     }
+
+    @Test func earlyGlitchIsRejected() {
+        let start = Date(timeIntervalSince1970: 0)
+        let glitch = GPSSample(timestamp: start.addingTimeInterval(1),
+                               lat: base.latitude + 0.1, lng: base.longitude, // ~11 km away and back
+                               speed: 12, accuracy: 5)
+        var samples = [GPSSample(timestamp: start, lat: base.latitude, lng: base.longitude, speed: 12, accuracy: 5),
+                       glitch]
+        for i in 2..<6 {
+            samples.append(GPSSample(timestamp: start.addingTimeInterval(Double(i)),
+                                     lat: base.latitude, lng: base.longitude + Double(i) * 0.0003,
+                                     speed: 12, accuracy: 5))
+        }
+        let filtered = GPSOutlierFilter.filterOutliers(samples)
+        #expect(!filtered.contains { abs($0.lat - (base.latitude + 0.1)) < 0.001 })
+        #expect(filtered.count == samples.count - 1)
+    }
+
+    @Test func leadingFixGlitchIsRejected() {
+        let start = Date(timeIntervalSince1970: 0)
+        var samples = [GPSSample(timestamp: start, lat: base.latitude + 0.1, lng: base.longitude, // glitch
+                                 speed: 12, accuracy: 5)]
+        for i in 1..<6 {
+            samples.append(GPSSample(timestamp: start.addingTimeInterval(Double(i)),
+                                     lat: base.latitude, lng: base.longitude + Double(i) * 0.0003,
+                                     speed: 12, accuracy: 5))
+        }
+        let filtered = GPSOutlierFilter.filterOutliers(samples)
+        #expect(!filtered.contains { abs($0.lat - (base.latitude + 0.1)) < 0.001 })
+    }
+
+    @Test func fastStraightDriveSurvives() {
+        // 0.00145 lng ~= 120 m at this latitude, one fix per second ~= 120 m/s ~= 268 mph
+        let samples = track(steps: 6, lngStep: 0.00145, speed: 120)
+        let filtered = GPSOutlierFilter.filterOutliers(samples)
+        #expect(filtered.count == samples.count)
+    }
 }

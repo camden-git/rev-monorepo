@@ -121,7 +121,7 @@ struct RootView: View {
     private var mapContent: some View {
         HexMapView(
             store: store,
-            breadcrumb: tracker.drivePath,
+            breadcrumb: tracker.drivePathSegments,
             onVisibleCellsChange: { cells in scheduleVisibleTileSync(cells) },
             onSelectTile: { tile in selectedTile = tile }
         )

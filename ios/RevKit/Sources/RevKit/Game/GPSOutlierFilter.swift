@@ -3,8 +3,9 @@ import Foundation
 
 /// cleans a raw GPS path before scoring, this will eventually be server side
 /// REF: docs/game-design.md §Raw GPS Outlier Filter:
-///   1. reject any sample w/ >1g sustained acceleration vs. the prior retained sample
-///   2. apply smoothing to the remaining samples' reported speeds
+///   1. reject GPS "teleport" spikes by geometry (a glitch fix flings away and snaps back)
+///   2. reject any sample w/ >1g sustained acceleration vs. the prior retained sample
+///   3. apply smoothing to the remaining samples' reported speeds
 ///
 /// note: never put any speed cap!
 public enum GPSOutlierFilter {
@@ -13,7 +14,64 @@ public enum GPSOutlierFilter {
 
     static let smoothingWindow = 3
 
+    /// a fix must fling at least this far from the path before it's even considered a teleport
+    /// spike
+    static let spikeExcursionMeters = 50.0
+
+    /// how much longer the in-and-out detour through a fix must be than the straight hop past it
+    /// before that fix is treated as a spike
+    static let spikeDetourRatio = 4.0
+
     public static func filterOutliers(_ samples: [GPSSample]) -> [GPSSample] {
+        guard samples.count > 2 else { return samples }
+        return smoothSpeeds(rejectAccelerationOutliers(rejectPositionSpikes(samples)))
+    }
+
+    static func rejectPositionSpikes(_ samples: [GPSSample]) -> [GPSSample] {
+        guard samples.count > 2 else { return samples }
+
+        var kept: [GPSSample] = [samples[0]]
+        for i in 1..<(samples.count - 1) {
+            let prev = kept[kept.count - 1]
+            if isSpike(prev: prev, cur: samples[i], next: samples[i + 1]) { continue }
+            kept.append(samples[i])
+        }
+        kept.append(samples[samples.count - 1])
+
+        // the first and last fixes have only one neighbour, so the detour test can't triangulate
+        // them. fall back to a relative-speed check
+        if kept.count > 2, endpointIsSpike(kept[0], kept[1], kept[2]) {
+            kept.removeFirst()
+        }
+        if kept.count > 2, endpointIsSpike(kept[kept.count - 1], kept[kept.count - 2], kept[kept.count - 3]) {
+            kept.removeLast()
+        }
+        return kept
+    }
+
+    /// true when `cur` is a teleport spike between `prev` and `next`
+    private static func isSpike(prev: GPSSample, cur: GPSSample, next: GPSSample) -> Bool {
+        let excursion = distanceMeters(prev, cur)
+        guard excursion > spikeExcursionMeters else { return false }
+        let detour = excursion + distanceMeters(cur, next)
+        let direct = distanceMeters(prev, next)
+        return detour > spikeDetourRatio * max(direct, 1)
+    }
+
+    /// true when endpoint `a` (with inward neighbours `b` then `c`) is an uncorroborated spike
+    private static func endpointIsSpike(_ a: GPSSample, _ b: GPSSample, _ c: GPSSample) -> Bool {
+        let dtAB = abs(b.timestamp.timeIntervalSince(a.timestamp))
+        let dtBC = abs(c.timestamp.timeIntervalSince(b.timestamp))
+        guard dtAB > 0, dtBC > 0 else { return false }
+        let excursion = distanceMeters(a, b)
+        guard excursion > spikeExcursionMeters else { return false }
+        let hopSpeed = excursion / dtAB
+        let trustedSpeed = distanceMeters(b, c) / dtBC
+        return hopSpeed > spikeDetourRatio * max(trustedSpeed, 1)
+    }
+
+    /// reject any sample implying >1g sustained acceleration vs. the prior retained sample
+    static func rejectAccelerationOutliers(_ samples: [GPSSample]) -> [GPSSample] {
         guard samples.count > 2 else { return samples }
 
         var retained: [GPSSample] = [samples[0]]
@@ -36,7 +94,7 @@ public enum GPSOutlierFilter {
             prevImpliedSpeed = impliedSpeed
         }
 
-        return smoothSpeeds(retained)
+        return retained
     }
 
     /// window-3 centered moving average over the `speed` field

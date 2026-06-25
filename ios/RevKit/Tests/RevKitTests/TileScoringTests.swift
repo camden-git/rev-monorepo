@@ -112,6 +112,64 @@ struct TileScoringTests {
         #expect(stats.movingTime == 0)
     }
 
+    /// a fix-to-fix gap longer than `maxSegmentGap` (the app was suspended mid-drive) must not be
+    /// scored as a straight-line corridor of free tiles between the two distant fixes
+    @Test func gapSegmentEarnsNoScoreOrDistance() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let gap = TileScoring.maxSegmentGap + 60 // suspended for a minute past the threshold
+
+        let samples = [
+            GPSSample(timestamp: t0, lat: base.latitude, lng: base.longitude, speed: -1, accuracy: 5),
+            GPSSample(timestamp: t0.addingTimeInterval(gap), lat: base.latitude, lng: base.longitude + 0.02, speed: -1, accuracy: 5),
+        ]
+        #expect(TileScoring.perTileScores(for: samples).isEmpty)
+        let stats = TileScoring.movementStats(for: samples)
+        #expect(stats.distanceMeters == 0)
+        #expect(stats.movingTime == 0)
+    }
+
+    /// the gap only drops the bridging segment
+    @Test func realTravelAroundAGapStillScores() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        var samples = track(steps: 4, lngStep: 0.0003, dt: 2.0) // continuous leg before the gap
+        let last = samples.last!
+        let resume = last.timestamp.addingTimeInterval(TileScoring.maxSegmentGap + 30)
+        // a second continuous leg far away, after the gap
+        for i in 0..<4 {
+            samples.append(GPSSample(
+                timestamp: resume.addingTimeInterval(Double(i) * 2.0),
+                lat: base.latitude,
+                lng: base.longitude + 0.02 + Double(i) * 0.0003,
+                speed: -1, accuracy: 5
+            ))
+        }
+        _ = t0
+        let stats = TileScoring.movementStats(for: samples)
+        // both legs counted, the gap stride between them excluded
+        let legDistance = zip(samples, samples.dropFirst())
+            .map { GPSOutlierFilter.distanceMeters($0, $1) }
+        let bridge = legDistance[3] // the one stride spanning the gap
+        let expected = legDistance.reduce(0, +) - bridge
+        #expect(abs(stats.distanceMeters - expected) < 0.5)
+    }
+
+    /// the breadcrumb splits into one segment per continuous leg, so the map shows a gap rather
+    /// than a false straight line
+    @Test func segmentedPathBreaksOnGap() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        var samples = track(steps: 3, lngStep: 0.0003, dt: 1.0)
+        let resume = samples.last!.timestamp.addingTimeInterval(TileScoring.maxSegmentGap + 5)
+        for i in 0..<3 {
+            samples.append(GPSSample(timestamp: resume.addingTimeInterval(Double(i)),
+                                     lat: base.latitude, lng: base.longitude + 0.02 + Double(i) * 0.0003,
+                                     speed: -1, accuracy: 5))
+        }
+        let segments = TileScoring.segmentedPath(samples)
+        #expect(segments.count == 2)
+        #expect(segments[0].count == 3)
+        #expect(segments[1].count == 3)
+    }
+
     /// the score is distance-weighted
     @Test func scoreIsDistanceWeightedNotArithmeticMean() {
         let start = Date(timeIntervalSince1970: 0)
