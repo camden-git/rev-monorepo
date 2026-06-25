@@ -13,6 +13,7 @@ import (
 	"github.com/camden-git/rev-monorepo/backend/internal/hooks"
 	"github.com/camden-git/rev-monorepo/backend/internal/notify"
 	"github.com/camden-git/rev-monorepo/backend/internal/push"
+	"github.com/camden-git/rev-monorepo/backend/internal/roads"
 	"github.com/camden-git/rev-monorepo/backend/internal/routes"
 	"github.com/camden-git/rev-monorepo/backend/internal/stats"
 
@@ -42,6 +43,7 @@ func main() {
 	routes.RegisterSocialRoutes(app)
 	routes.RegisterDeviceRoutes(app)
 	stats.RegisterSnapshotCron(app)
+	roads.RegisterSeeder(app, roads.ConfigFromEnv())
 
 	// local dev stuff
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {

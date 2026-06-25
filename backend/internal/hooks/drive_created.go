@@ -171,12 +171,16 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 	h3str := strconv.FormatUint(h3, 10)
 	existing := findTile(txApp, h3str)
 
-	refSpeed := game.ReferenceSpeedPrior
+	band := game.BandForClass(game.ClassUnknown)
+	refSpeed := band.Prior
 	obsCount := 0
 	var current *game.TileState
 	if existing != nil {
+		band = game.BandForClass(game.RoadClass(existing.GetString("road_class")))
 		if storedRef := existing.GetFloat("ref_speed"); storedRef > 0 {
 			refSpeed = storedRef
+		} else {
+			refSpeed = band.Prior
 		}
 		obsCount = existing.GetInt("obs_count")
 		current = &game.TileState{
@@ -187,8 +191,11 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		}
 	}
 
-	strength := game.Strength(speedMph, refSpeed)
-	nextRef := game.UpdateReference(refSpeed, speedMph)
+	// clamp into the band before scoring and before folding in the new sample so
+	// neither the score nor the stored reference can leave the road's envelope
+	effectiveRef := game.ClampReference(refSpeed, band)
+	strength := game.Strength(speedMph, effectiveRef)
+	nextRef := game.ClampReference(game.UpdateReference(effectiveRef, speedMph), band)
 	nextObs := obsCount + 1
 
 	outcome := game.Resolve(current, userID, strength, now)
