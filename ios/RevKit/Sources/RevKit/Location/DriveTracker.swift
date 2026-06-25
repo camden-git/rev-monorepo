@@ -57,6 +57,9 @@ public final class DriveTracker {
     private var isMoving = false
     private var stationaryDropTask: Task<Void, Never>?
 
+    /// set when the user manually ends a drive while still in motion
+    private var autoStartSuppressed = false
+
     /// live enclosure-closure tracking, reset per drive
     private var visitedTiles: Set<UInt64> = []
     private var ownedAtDriveStart: Set<UInt64> = []
@@ -106,12 +109,15 @@ public final class DriveTracker {
 
     /// manually begin recording (sim)
     public func startDrive() {
+        autoStartSuppressed = false // opting back in
         beginDriveIfNeeded()
         escalateAccuracy()
     }
 
-    /// manually finish recording
+    /// manually finish recording. suppress motion auto-restart so Stop sticks while the car is still
+    /// moving
     public func endDrive() {
+        autoStartSuppressed = true
         finalizeDrive()
         deescalateAccuracy()
     }
@@ -134,6 +140,7 @@ public final class DriveTracker {
             stationaryDropTask?.cancel()
             stationaryDropTask = nil
             if !isMoving { isMoving = true }
+            guard !autoStartSuppressed else { return }
             beginDriveIfNeeded()
             escalateAccuracy()
         } else if stationary, isMoving, stationaryDropTask == nil {
@@ -143,6 +150,8 @@ public final class DriveTracker {
                 guard !Task.isCancelled else { return }
                 isMoving = false
                 stationaryDropTask = nil
+                // the trip actually ended
+                autoStartSuppressed = false
                 finalizeDrive()
                 deescalateAccuracy()
             }
