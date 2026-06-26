@@ -17,6 +17,7 @@
 		50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C0F969107087F96013E67F /* LeaderboardView.swift */; };
 		750F9185B65529585FBA4B91 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5581F52012A4971B7DF1565F /* AppleSignInButton.swift */; };
 		76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136227412603B5999AB44748 /* ProfileSettingsView.swift */; };
+		A1A0570000000000A0000002 /* AutoStartSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A0570000000000A0000001 /* AutoStartSettingsView.swift */; };
 		8C8F06F9CBBAC65E17612939 /* TileDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23E45A1D168FC97A7B75918 /* TileDetailView.swift */; };
 		93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15713F2A44FA62B340F54D44 /* OnboardingView.swift */; };
 		9422689350B941F2325CCDA5 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76981DF5A715E1D4AC6D1 /* RootView.swift */; };
@@ -34,6 +35,7 @@
 /* Begin PBXFileReference section */
 		10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryView.swift; sourceTree = "<group>"; };
 		136227412603B5999AB44748 /* ProfileSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsView.swift; sourceTree = "<group>"; };
+		A1A0570000000000A0000001 /* AutoStartSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoStartSettingsView.swift; sourceTree = "<group>"; };
 		14FDC10F6072E934167CD1D7 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
 		15713F2A44FA62B340F54D44 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		26711864EBD6BFBDD37E9669 /* Rev.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rev.entitlements; sourceTree = "<group>"; };
@@ -117,6 +119,7 @@
 				2B2B2B2B2B2B2B2B2B2B2B04 /* AppDelegate.swift */,
 				30F692E402518C09F1A7976B /* ProfileHubView.swift */,
 				136227412603B5999AB44748 /* ProfileSettingsView.swift */,
+				A1A0570000000000A0000001 /* AutoStartSettingsView.swift */,
 				A612DB066C3D529986584A8B /* RevApp.swift */,
 				32B76981DF5A715E1D4AC6D1 /* RootView.swift */,
 				F23E45A1D168FC97A7B75918 /* TileDetailView.swift */,
@@ -223,6 +226,7 @@
 				1A1A1A1A1A1A1A1A1A1A1A04 /* AppDelegate.swift in Sources */,
 				2615CE59F90260D68D2E4C51 /* ProfileHubView.swift in Sources */,
 				76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */,
+				A1A0570000000000A0000002 /* AutoStartSettingsView.swift in Sources */,
 				119E9B7B0B8DD0AB4F9E8D22 /* RevApp.swift in Sources */,
 				9422689350B941F2325CCDA5 /* RootView.swift in Sources */,
 				8C8F06F9CBBAC65E17612939 /* TileDetailView.swift in Sources */,

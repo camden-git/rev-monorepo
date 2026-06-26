@@ -9,6 +9,7 @@ struct ProfileHubView: View {
     let sync: SyncService
     let social: SocialService
     let signIn: AppleSignInCoordinator
+    let autoStart: AutoStartPreferences
     var onDone: () -> Void = {}
 
     @State private var confirmSignOut = false
@@ -42,6 +43,11 @@ struct ProfileHubView: View {
                         ProfileSettingsView(store: store, sync: sync, social: social, embedded: true)
                     } label: {
                         Label("Edit Profile", systemImage: "pencil")
+                    }
+                    NavigationLink {
+                        AutoStartSettingsView(preferences: autoStart, embedded: true)
+                    } label: {
+                        Label("Auto-Start", systemImage: "figure.walk.motion")
                     }
                 }
 

@@ -53,6 +53,9 @@ public final class DriveTracker {
     /// every second doesn't re-filter the whole path on every access
     public private(set) var driveDistanceMeters: Double = 0
 
+    /// which motion types are allowed to auto-start a drive
+    public let autoStart: AutoStartPreferences
+
     private let store: TerritoryStore
     private let locationManager = CLLocationManager()
     private let activityManager = CMMotionActivityManager()
@@ -91,8 +94,9 @@ public final class DriveTracker {
     /// don't re-flush a tile whose score barely moved
     private let liveFlushScoreEpsilon: Double = 0.5
 
-    public init(store: TerritoryStore) {
+    public init(store: TerritoryStore, autoStart: AutoStartPreferences = AutoStartPreferences()) {
         self.store = store
+        self.autoStart = autoStart
         self.authorizationStatus = locationManager.authorizationStatus
         delegate.tracker = self
         locationManager.delegate = delegate
@@ -132,19 +136,28 @@ public final class DriveTracker {
         guard CMMotionActivityManager.isActivityAvailable() else { return } // false in Simulator
         activityManager.startActivityUpdates(to: .main) { [weak self] activity in
             guard let activity else { return }
-            let moving = activity.automotive || activity.cycling || activity.walking || activity.running
+            // snapshot the per-type flags off CMMotionActivity before hopping to the actor
+            var active: Set<AutoStartPreferences.Activity> = []
+            if activity.automotive { active.insert(.automotive) }
+            if activity.cycling { active.insert(.cycling) }
+            if activity.walking { active.insert(.walking) }
+            if activity.running { active.insert(.running) }
             let stationary = activity.stationary
             // handler is delivered on the main queue
-            Task { @MainActor [weak self] in self?.activityChanged(moving: moving, stationary: stationary) }
+            Task { @MainActor [weak self] in self?.activityChanged(active: active, stationary: stationary) }
         }
     }
 
-    private func activityChanged(moving: Bool, stationary: Bool) {
+    private func activityChanged(active: Set<AutoStartPreferences.Activity>, stationary: Bool) {
+        let moving = !active.isEmpty
+        // a drive only auto begins for activity types the user left enabled; any motion still keeps
+        // an in-progress drive alive (we only gate starting, not continuing)
+        let autoStartAllowed = active.contains { autoStart.isEnabled($0) }
         if moving {
             stationaryDropTask?.cancel()
             stationaryDropTask = nil
             if !isMoving { isMoving = true }
-            guard !autoStartSuppressed else { return }
+            guard !autoStartSuppressed, autoStartAllowed else { return }
             beginDriveIfNeeded()
             escalateAccuracy()
         } else if stationary, isMoving, stationaryDropTask == nil {
