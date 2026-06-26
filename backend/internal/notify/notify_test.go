@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/camden-git/rev-monorepo/backend/internal/push"
 )
@@ -76,6 +77,60 @@ func TestSocialPayloads(t *testing.T) {
 	accepted := followAcceptedPayload("Grace", "u2")
 	if accepted.Body != "Grace accepted your follow request" || accepted.Data["type"] != "follow_accepted" {
 		t.Fatalf("follow accepted payload wrong: %+v", accepted)
+	}
+}
+
+// startsNewAttack must fire once when an attack begins, stay quiet while the
+// attacker keeps taking tiles, and fire again only after a cooldown
+func TestStartsNewAttackCollapsesSustainedAttack(t *testing.T) {
+	clock := time.Unix(0, 0)
+	s := &Service{
+		cooldown:    10 * time.Minute,
+		now:         func() time.Time { return clock },
+		lastCapture: map[attackKey]time.Time{},
+	}
+
+	if !s.startsNewAttack("victim", "attacker") {
+		t.Fatal("first capture should start a new attack")
+	}
+
+	// a stream of captures within the cooldown is all one attack
+	for i := 0; i < 5; i++ {
+		clock = clock.Add(30 * time.Second)
+		if s.startsNewAttack("victim", "attacker") {
+			t.Fatalf("capture %d within cooldown should not re-notify", i)
+		}
+	}
+
+	// the attacker leaves: a gap of at least the cooldown opens a new attack
+	clock = clock.Add(10 * time.Minute)
+	if !s.startsNewAttack("victim", "attacker") {
+		t.Fatal("capture after a cooldown-long gap should start a new attack")
+	}
+
+	// a different attacker is tracked independently
+	if !s.startsNewAttack("victim", "other") {
+		t.Fatal("a different attacker should start its own attack")
+	}
+}
+
+func TestPruneLockedDropsStalePairs(t *testing.T) {
+	clock := time.Unix(0, 0)
+	s := &Service{
+		cooldown:    10 * time.Minute,
+		now:         func() time.Time { return clock },
+		lastCapture: map[attackKey]time.Time{},
+	}
+	s.lastCapture[attackKey{"v", "stale"}] = clock
+	s.lastCapture[attackKey{"v", "fresh"}] = clock.Add(15 * time.Minute)
+
+	s.pruneLocked(clock.Add(12 * time.Minute))
+
+	if _, ok := s.lastCapture[attackKey{"v", "stale"}]; ok {
+		t.Fatal("stale pair should be pruned")
+	}
+	if _, ok := s.lastCapture[attackKey{"v", "fresh"}]; !ok {
+		t.Fatal("fresh pair should be retained")
 	}
 }
 

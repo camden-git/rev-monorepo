@@ -3,12 +3,21 @@ package notify
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/camden-git/rev-monorepo/backend/internal/push"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+// captureCooldown is how long an attacker must stop taking a victim's tiles
+// before a fresh capture counts as a new attack worth another notification
+const captureCooldown = 10 * time.Minute
+
+// pruneThreshold bounds the cooldown map: once it grows past this many live
+// (victim, attacker) pairs we sweep out entries older than the cooldown
+const pruneThreshold = 1024
 
 // Notifier raises user-facing push notifications for game and social events. It
 // is an interface so hooks can be tested without a live APNs connection, and so
@@ -29,17 +38,68 @@ type Notifier interface {
 type Service struct {
 	app    core.App
 	sender push.Sender
+
+	// cooldown is the gap that separates one attack from the next
+	cooldown time.Duration
+	now      func() time.Time
+
+	mu sync.Mutex
+	// lastCapture tracks the most recent capture activity per (victim,
+	// attacker) pair so continuous captures collapse to one notification
+	lastCapture map[attackKey]time.Time
+}
+
+// attackKey identifies a directed attack
+type attackKey struct {
+	victimID   string
+	attackerID string
 }
 
 func NewService(app core.App, sender push.Sender) *Service {
-	return &Service{app: app, sender: sender}
+	return &Service{
+		app:         app,
+		sender:      sender,
+		cooldown:    captureCooldown,
+		now:         time.Now,
+		lastCapture: map[attackKey]time.Time{},
+	}
 }
 
 func (s *Service) TileCaptured(victimID, attackerID string, tileCount int) {
 	if victimID == "" || victimID == attackerID || tileCount <= 0 {
 		return
 	}
+	if !s.startsNewAttack(victimID, attackerID) {
+		return
+	}
 	s.dispatch(victimID, tileCapturedPayload(s.displayName(attackerID), attackerID, tileCount))
+}
+
+// startsNewAttack records capture activity for an (victim, attacker) pair and
+// reports whether enough time has passed since the last capture to treat
+// this as a new attack
+func (s *Service) startsNewAttack(victimID, attackerID string) bool {
+	key := attackKey{victimID: victimID, attackerID: attackerID}
+	now := s.now()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	last, seen := s.lastCapture[key]
+	s.lastCapture[key] = now
+	if len(s.lastCapture) > pruneThreshold {
+		s.pruneLocked(now)
+	}
+	return !seen || now.Sub(last) >= s.cooldown
+}
+
+// pruneLocked drops pairs that have been quiet longer than the cooldown
+func (s *Service) pruneLocked(now time.Time) {
+	for key, ts := range s.lastCapture {
+		if now.Sub(ts) >= s.cooldown {
+			delete(s.lastCapture, key)
+		}
+	}
 }
 
 func (s *Service) NewFollower(followeeID, followerID string) {
