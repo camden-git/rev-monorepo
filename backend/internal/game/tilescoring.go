@@ -21,6 +21,9 @@ const (
 	// MaxSegmentGap is the max time (s) between fixes before a segment is treated
 	// as a tracking gap rather than real travel
 	MaxSegmentGap = 10.0
+	// maxSegmentSpeed is the fastest a segment can imply (m/s, ~200 mph) before
+	// it's treated as a GPS teleport rather than real travel
+	maxSegmentSpeed = 134
 	// subStepMeters is the target length each segment is broken into for tile
 	// attribution (small relative to a ~130 m res-10 hex)
 	subStepMeters = 8.0
@@ -58,6 +61,9 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 		segmentSpeed := distance / dt
 		if segmentSpeed < stoppedSpeedMetersPerSecond {
 			continue
+		}
+		if segmentSpeed > maxSegmentSpeed {
+			continue // GPS teleport: don't interpolate a line between far-apart fixes
 		}
 
 		// walk the segment in small steps and attribute each step's distance/time

@@ -20,6 +20,10 @@ public enum TileScoring {
     /// real travel
     public static let maxSegmentGap: TimeInterval = 10
 
+    /// fastest a segment can imply (m/s) before it's treated as a GPS teleport rather than
+    /// real travel
+    static let maxSegmentSpeedMetersPerSecond = 134
+
     /// target length (m) of each sub-step a segment is broken into for tile attribution. small
     /// relative to a res-10 hex (~130 m wide) so a segment is credited to each tile in proportion
     /// to how much of it actually lies inside that tile.
@@ -47,6 +51,8 @@ public enum TileScoring {
             let distance = GPSOutlierFilter.distanceMeters(a, b)
             let segmentSpeed = distance / dt
             guard segmentSpeed >= stoppedSpeedMetersPerSecond else { continue }
+            // a GPS teleport: don't interpolate a line between two far-apart fixes
+            guard segmentSpeed <= maxSegmentSpeedMetersPerSecond else { continue }
 
             // walk the segment in small steps and attribute each step's distance/time to the tile
             // it falls in. this keeps a barely-clipped tile from inheriting a whole segment's worth
@@ -86,6 +92,7 @@ public enum TileScoring {
             let distance = GPSOutlierFilter.distanceMeters(a, b)
             let segmentSpeed = distance / dt
             guard segmentSpeed >= stoppedSpeedMetersPerSecond else { continue }
+            guard segmentSpeed <= maxSegmentSpeedMetersPerSecond else { continue }
 
             totalDistance += distance
             totalMovingTime += dt

@@ -89,16 +89,21 @@ public enum Enclosure {
         return hi / lo <= maxAspect
     }
 
+    /// max grid steps contiguousRing will stitch between two consecutive trail cells
+    private static let maxBridgeGridDistance: Int64 = 16
+
     /// stitch consecutive trail cells into one contiguous set
     private static func contiguousRing(from trail: [UInt64]) -> Set<UInt64> {
         var ring: Set<UInt64> = []
         guard let first = trail.first else { return ring }
         ring.insert(first)
         for (a, b) in zip(trail, trail.dropFirst()) where a != b {
-            if let path = try? H3Cell(a).path(to: H3Cell(b)) {
+            if let d = try? H3Cell(a).gridDistance(to: H3Cell(b)), d <= maxBridgeGridDistance,
+               let path = try? H3Cell(a).path(to: H3Cell(b)) {
                 for cell in path { ring.insert(cell.id) }
             } else {
-                ring.insert(b) // if it is a far segement we can accept possibly not closing
+                // gap/teleport (or unbridgeable): don't draw a line across it
+                ring.insert(b)
             }
         }
         return ring

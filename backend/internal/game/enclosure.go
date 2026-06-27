@@ -103,6 +103,10 @@ func Enclose(trail []uint64, opt EncloseOptions) Result {
 	return Result{ScoredInterior: gradient(interior, walls, opt.LoopScore)}
 }
 
+// maxBridgeGridDistance caps how many grid steps contiguousRing will stitch
+// between two consecutive trail cells
+const maxBridgeGridDistance = 16
+
 // contiguousRing stitches consecutive trail cells into one contiguous set
 func contiguousRing(trail []uint64) map[uint64]bool {
 	ring := map[uint64]bool{}
@@ -113,6 +117,10 @@ func contiguousRing(trail []uint64) map[uint64]bool {
 	for i := 1; i < len(trail); i++ {
 		a, b := trail[i-1], trail[i]
 		if a == b {
+			continue
+		}
+		if d, ok := h3util.GridDistance(a, b); !ok || d > maxBridgeGridDistance {
+			ring[b] = true // gap/teleport: don't bridge two far-apart cells
 			continue
 		}
 		if path, ok := h3util.GridPath(a, b); ok {
