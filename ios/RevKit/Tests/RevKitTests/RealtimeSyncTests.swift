@@ -39,19 +39,19 @@ struct RealtimeSyncTests {
         let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
         sync.adoptSession(AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
 
-        await sync.flushLiveClaims([SyncFixtures.cell: 33.0])
+        await sync.flushLiveClaims(SyncFixtures.liveBatch)
 
         #expect(client.claimBatches.count == 1)
-        #expect(client.claimBatches.first?[SyncFixtures.cell] == 33.0)
+        #expect(client.claimBatches.first?.count == SyncFixtures.liveBatch.count)
     }
 
     @Test func flushLiveClaimsSkippedWhenSignedOutOrEmpty() async throws {
         let client = MockPocketBaseClient()
         let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())
 
-        await sync.flushLiveClaims([SyncFixtures.cell: 33.0]) // signed out -> skip
+        await sync.flushLiveClaims(SyncFixtures.liveBatch) // signed out -> skip
         sync.adoptSession(AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
-        await sync.flushLiveClaims([:]) // empty -> skip
+        await sync.flushLiveClaims([]) // empty -> skip
 
         #expect(client.claimBatches.isEmpty)
     }

@@ -15,9 +15,9 @@ import (
 
 const maxTileWindowParents = 256
 
-// a single in-drive flush is the tiles touched since the last flush (a few
-// seconds), so a generous cap still bounds abuse
-const maxClaimBatch = 2048
+// a single in-drive flush carries the raw GPS samples recorded since the last
+// flush (a few seconds), so a generous cap still bounds abuse
+const maxClaimSamples = 4096
 
 type tileWindowRequest struct {
 	ParentResolution int      `json:"parent_resolution"`
@@ -28,8 +28,9 @@ type tileWindowResponse struct {
 	Items []*core.Record `json:"items"`
 }
 
+// tileClaimRequest carries the raw GPS samples for the in-drive batch
 type tileClaimRequest struct {
-	PerTileScores map[string]float64 `json:"per_tile_scores"`
+	RawPath []hooks.RawSample `json:"raw_path"`
 }
 
 // RegisterTileRoutes adds purpose-built map tile endpoints
@@ -54,13 +55,13 @@ func tileClaimHandler(notifier notify.Notifier) func(*core.RequestEvent) error {
 		if err := e.BindBody(&form); err != nil {
 			return e.BadRequestError("invalid tile claim request.", err)
 		}
-		if len(form.PerTileScores) == 0 {
+		if len(form.RawPath) == 0 {
 			return e.JSON(http.StatusOK, map[string]bool{"ok": true})
 		}
-		if len(form.PerTileScores) > maxClaimBatch {
+		if len(form.RawPath) > maxClaimSamples {
 			return e.BadRequestError("tile claim batch is too large", nil)
 		}
-		captures, err := hooks.ResolveDirectClaims(e.App, e.Auth.Id, form.PerTileScores, time.Now())
+		captures, err := hooks.ResolveDirectClaims(e.App, e.Auth.Id, hooks.SamplesFromRaw(form.RawPath), time.Now())
 		if err != nil {
 			return e.InternalServerError("failed to resolve tile claims", err)
 		}

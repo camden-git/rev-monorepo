@@ -52,10 +52,34 @@ func stampDriveOwner(e *core.RecordRequestEvent) error {
 	return nil
 }
 
-// gpsSample is the slice of drives.raw_path the server uses
-type gpsSample struct {
-	Lat float64 `json:"lat"`
-	Lng float64 `json:"lng"`
+// RawSample is one drives.raw_path entry as stored on the wire. It mirrors the
+// RevKit GPSSample JSON shape ({timestamp, lat, lng, speed, accuracy}); the
+// server reads timestamp, lat, lng, and speed.
+type RawSample struct {
+	TS    string  `json:"timestamp"`
+	Lat   float64 `json:"lat"`
+	Lng   float64 `json:"lng"`
+	Speed float64 `json:"speed"`
+}
+
+// rawPathTimeLayout is the datetime format RevKit's PocketBaseCoding writes into
+// raw_path timestamps (see ios .../Sync/PocketBaseCoding.swift)
+const rawPathTimeLayout = "2006-01-02 15:04:05.000Z"
+
+// SamplesFromRaw parses raw_path entries into scoring samples, dropping any whose
+// timestamp can't be parsed (a sample with no usable time can't be scored)
+func SamplesFromRaw(raw []RawSample) []game.Sample {
+	out := make([]game.Sample, 0, len(raw))
+	for _, s := range raw {
+		ts, err := time.Parse(rawPathTimeLayout, s.TS)
+		if err != nil {
+			if ts, err = time.Parse(time.RFC3339Nano, s.TS); err != nil {
+				continue
+			}
+		}
+		out = append(out, game.Sample{TS: ts, Lat: s.Lat, Lng: s.Lng, Speed: s.Speed})
+	}
+	return out
 }
 
 func resolveDrive(app core.App, drive *core.Record, notifier notify.Notifier) error {
@@ -64,19 +88,18 @@ func resolveDrive(app core.App, drive *core.Record, notifier notify.Notifier) er
 		return errors.New("drive has no user")
 	}
 
-	var perTile map[string]float64
-	if err := drive.UnmarshalJSONField("per_tile_scores", &perTile); err != nil {
-		return fmt.Errorf("per_tile_scores: %w", err)
-	}
-	var rawPath []gpsSample
+	var rawPath []RawSample
 	if err := drive.UnmarshalJSONField("raw_path", &rawPath); err != nil {
 		return fmt.Errorf("raw_path: %w", err)
 	}
 
 	now := time.Now()
 
-	// TODO: re-derive per_tile_scores from raw_path via a ported TileScoring
-	// for anticheat
+	// server-authoritative scoring: re-derive per-tile scores from the raw GPS
+	// path itself rather than trusting the client-supplied per_tile_scores (kept
+	// only for the client's own optimistic in-drive preview)
+	cleaned := game.FilterOutliers(SamplesFromRaw(rawPath))
+	perTile := game.PerTileScores(cleaned)
 
 	// owners this drive displaced, tallied so each victim gets one aggregated
 	// push rather than one per tile. populated inside the transaction, dispatched
@@ -85,17 +108,13 @@ func resolveDrive(app core.App, drive *core.Record, notifier notify.Notifier) er
 	err := app.RunInTransaction(func(txApp core.App) error {
 		// 1: per-tile direct resolution
 		claimedThisDrive := map[uint64]bool{}
-		strengths := map[string]float64{}
-		for h3str, score := range perTile {
-			h3, err := strconv.ParseUint(h3str, 10, 64)
-			if err != nil {
-				continue // skip malformed keys rather than fail the whole drive
-			}
+		strengths := map[uint64]float64{}
+		for h3, score := range perTile {
 			changed, strength, capturedFrom, err := resolveTile(txApp, h3, userID, score, now)
 			if err != nil {
 				return err
 			}
-			strengths[h3str] = strength
+			strengths[h3] = strength
 			if changed {
 				claimedThisDrive[h3] = true
 			}
@@ -104,8 +123,8 @@ func resolveDrive(app core.App, drive *core.Record, notifier notify.Notifier) er
 			}
 		}
 
-		// 2: enclosure flood-fill
-		if err := resolveEnclosure(txApp, drive, userID, rawPath, strengths, claimedThisDrive, now, captures); err != nil {
+		// 2: enclosure flood-fill over the same cleaned path
+		if err := resolveEnclosure(txApp, drive, userID, cleaned, strengths, claimedThisDrive, now, captures); err != nil {
 			return err
 		}
 		return nil
@@ -127,27 +146,26 @@ func notifyCaptures(notifier notify.Notifier, attackerID string, captures map[st
 	}
 }
 
-// ResolveDirectClaims applies a batch of direct per-tile claims for one user in a
-// single transaction
+// ResolveDirectClaims scores a batch of raw GPS samples for one user and applies
+// the resulting direct per-tile claims in a single transaction
 //
 // used by the live in-drive claim endpoint so captures broadcast over the `tiles`
-// realtime topic as they happen instead of only when the drive is uploaded
+// realtime topic as they happen instead of only when the drive is uploaded. like
+// the end-of-drive resolution it derives per-tile scores from the raw path
+// server-side, so a live capture is just as authoritative as the final upload
 //
 // returns the owners this batch displaced (victim id -> tile count) so the live
 // claim route can push capture notifications as they happen. captures are
 // collected inside the transaction but only returned after it commits, so a
 // rolled-back batch raises nothing.
-func ResolveDirectClaims(app core.App, userID string, perTile map[string]float64, now time.Time) (map[string]int, error) {
+func ResolveDirectClaims(app core.App, userID string, samples []game.Sample, now time.Time) (map[string]int, error) {
 	if userID == "" {
 		return nil, errors.New("claim batch has no user")
 	}
+	perTile := game.PerTileScores(game.FilterOutliers(samples))
 	captures := map[string]int{}
 	err := app.RunInTransaction(func(txApp core.App) error {
-		for h3str, score := range perTile {
-			h3, err := strconv.ParseUint(h3str, 10, 64)
-			if err != nil {
-				continue // skip malformed keys rather than fail the whole batch
-			}
+		for h3, score := range perTile {
 			_, _, capturedFrom, err := resolveTile(txApp, h3, userID, score, now)
 			if err != nil {
 				return err
@@ -261,14 +279,14 @@ func resolveEnclosure(
 	txApp core.App,
 	drive *core.Record,
 	userID string,
-	rawPath []gpsSample,
-	perTileStrengths map[string]float64,
+	cleaned []game.Sample,
+	perTileStrengths map[uint64]float64,
 	claimedThisDrive map[uint64]bool,
 	now time.Time,
 	captures map[string]int,
 ) error {
-	points := make([]game.Point, len(rawPath))
-	for i, s := range rawPath {
+	points := make([]game.Point, len(cleaned))
+	for i, s := range cleaned {
 		points[i] = game.Point{Lat: s.Lat, Lng: s.Lng}
 	}
 	trail := game.TilesCrossed(points)
@@ -438,7 +456,7 @@ func userHomeCell(txApp core.App, userID string) uint64 {
 	return h3
 }
 
-func meanScore(perTile map[string]float64) float64 {
+func meanScore(perTile map[uint64]float64) float64 {
 	if len(perTile) == 0 {
 		return 0
 	}

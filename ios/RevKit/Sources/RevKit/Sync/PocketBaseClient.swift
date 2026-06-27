@@ -21,9 +21,10 @@ public protocol PocketBaseClient: Sendable {
     /// `POST /api/collections/drives/records`
     func createDrive(_ payload: DriveUploadPayload) async throws -> DriveRecordDTO
 
-    /// stream the tiles claimed so far mid-drive so captures broadcast live to
-    /// other players instead of only at drive end. `POST /api/rev/tiles/claim`
-    func claimTiles(perTileScores: [UInt64: Double]) async throws
+    /// stream the raw GPS samples recorded so far mid-drive so the server scores
+    /// and resolves them and broadcasts captures live to other players instead of
+    /// only at drive end. `POST /api/rev/tiles/claim`
+    func claimTiles(rawPath: [GPSSample]) async throws
 
     /// fetch tiles changed since `updatedSince` (nil = full snapshot)
     /// `GET /api/collections/tiles/records?filter=(updated>="…")`

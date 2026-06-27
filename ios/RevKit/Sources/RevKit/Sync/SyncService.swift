@@ -238,12 +238,12 @@ public final class SyncService {
         }
     }
 
-    /// push the tiles claimed so far in the active drive so the server resolves and
-    /// broadcasts them live to other players
-    public func flushLiveClaims(_ perTileScores: [UInt64: Double]) async {
-        guard currentUserId != nil, !perTileScores.isEmpty else { return }
+    /// push the raw GPS samples recorded so far in the active drive so the server
+    /// scores, resolves, and broadcasts the resulting captures live to other players
+    public func flushLiveClaims(_ rawPath: [GPSSample]) async {
+        guard currentUserId != nil, !rawPath.isEmpty else { return }
         do {
-            try await client.claimTiles(perTileScores: perTileScores)
+            try await client.claimTiles(rawPath: rawPath)
         } catch {
             recordSyncFailure(error, operation: "flushLiveClaims", visible: false)
         }

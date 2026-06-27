@@ -36,7 +36,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     var onCreateDrive: @Sendable (DriveUploadPayload) throws -> DriveRecordDTO = { _ in
         DriveRecordDTO(id: "rec", created: nil)
     }
-    var onClaimTiles: @Sendable ([UInt64: Double]) throws -> Void = { _ in }
+    var onClaimTiles: @Sendable ([GPSSample]) throws -> Void = { _ in }
     var onListTiles: @Sendable (Date?) throws -> [TileDTO] = { _ in [] }
     var onListTilesForCells: @Sendable (Set<UInt64>) throws -> [TileDTO] = { _ in [] }
     var onAuth: @Sendable (String, String?) throws -> AuthResponse = { _, _ in
@@ -53,7 +53,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
     var onDeleteAccount: @Sendable () throws -> Void = { }
 
     private(set) var createdPayloads: [DriveUploadPayload] = []
-    private(set) var claimBatches: [[UInt64: Double]] = []
+    private(set) var claimBatches: [[GPSSample]] = []
     private(set) var listSinceArgs: [Date?] = []
     private(set) var listCellArgs: [Set<UInt64>] = []
     private(set) var listUsersCallCount = 0
@@ -83,9 +83,9 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         return try onCreateDrive(payload)
     }
 
-    func claimTiles(perTileScores: [UInt64: Double]) async throws {
-        lock.withLock { claimBatches.append(perTileScores) }
-        try onClaimTiles(perTileScores)
+    func claimTiles(rawPath: [GPSSample]) async throws {
+        lock.withLock { claimBatches.append(rawPath) }
+        try onClaimTiles(rawPath)
     }
 
     func listTiles(updatedSince: Date?) async throws -> [TileDTO] {
@@ -212,6 +212,12 @@ final class FakeUnsentDriveSource: UnsentDriveSource {
 enum SyncFixtures {
     /// a real res-10 H3 cell id (> 2^53)
     static let cell: UInt64 = H3Grid.cellId(for: .init(latitude: 41.8807, longitude: -87.6294))!
+
+    /// a short raw-GPS batch for the live in-drive claim endpoint
+    static let liveBatch: [GPSSample] = [
+        GPSSample(timestamp: Date(timeIntervalSince1970: 1_000_000), lat: 41.8807, lng: -87.6294, speed: 15, accuracy: 5),
+        GPSSample(timestamp: Date(timeIntervalSince1970: 1_000_001), lat: 41.8807, lng: -87.6292, speed: 15, accuracy: 5),
+    ]
 
     static func payload(id: UUID = UUID()) -> PendingDrive {
         PendingDrive(

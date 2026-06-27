@@ -106,16 +106,17 @@ public struct TileDTO: Decodable, Sendable, Equatable {
     }
 }
 
-/// POST body for the live in-drive claim endpoint `POST /api/rev/tiles/claim`
+/// POST body for the live in-drive claim endpoint `POST /api/rev/tiles/claim`.
+/// carries the raw GPS samples recorded since the last flush
 public struct TileClaimRequest: Encodable, Sendable {
-    public let perTileScores: PerTileScores
+    public let rawPath: [GPSSample]
 
-    public init(perTileScores: [UInt64: Double]) {
-        self.perTileScores = PerTileScores(perTileScores)
+    public init(rawPath: [GPSSample]) {
+        self.rawPath = rawPath
     }
 
     enum CodingKeys: String, CodingKey {
-        case perTileScores = "per_tile_scores"
+        case rawPath = "raw_path"
     }
 }
 

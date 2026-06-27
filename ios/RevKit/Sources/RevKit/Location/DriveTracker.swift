@@ -85,14 +85,12 @@ public final class DriveTracker {
     private var lastLiveRescore: Date = .distantPast
     private let liveRescoreInterval: TimeInterval = 3
 
-    /// invoked on the throttled live rescore with the tiles the local player has
-    /// claimed-or-refined since the last flush, wired by the app to `SyncService`
-    /// so captures stream to the server (and broadcast to others) mid-drive
-    public var onLiveClaims: (([UInt64: Double]) -> Void)?
-    /// per-drive record of what's already been flushed, so each tick sends only the delta
-    private var liveFlushedScores: [UInt64: Double] = [:]
-    /// don't re-flush a tile whose score barely moved
-    private let liveFlushScoreEpsilon: Double = 0.5
+    /// invoked on the throttled live rescore with the raw GPS samples recorded
+    /// since the last flush, wired by the app to `SyncService` so the server scores,
+    /// resolves, and broadcasts the resulting captures to others mid-drive
+    public var onLiveClaims: (([GPSSample]) -> Void)?
+    /// count of rawPath samples already streamed, so each tick sends only the new tail
+    private var liveFlushedSampleCount = 0
 
     public init(store: TerritoryStore, autoStart: AutoStartPreferences = AutoStartPreferences()) {
         self.store = store
@@ -218,7 +216,7 @@ public final class DriveTracker {
         lastDriveSummary = nil
         driveDistanceMeters = 0
         lastLiveRescore = .distantPast
-        liveFlushedScores = [:]
+        liveFlushedSampleCount = 0
     }
 
     /// remember who owned a cell the first time this drive claims it, so the summary can diff
@@ -266,26 +264,23 @@ public final class DriveTracker {
         let now = locations.last?.timestamp ?? Date()
         if now.timeIntervalSince(lastLiveRescore) >= liveRescoreInterval {
             lastLiveRescore = now
-            let scores = applyPerTileScores()
-            flushLiveClaims(rawScores: scores)
+            applyPerTileScores() // local optimistic HUD; the server re-scores authoritatively
+            flushLiveClaims()
         }
     }
 
-    /// stream the tiles the local player now holds (direct and enclosed) that are new
-    /// or materially re-scored since the last flush. The server expects raw mph
-    /// and performs the authoritative v2 strength conversion.
-    private func flushLiveClaims(rawScores: [UInt64: Double]) {
-        guard let onLiveClaims else { return }
-        let me = store.localPlayer.id
-        var delta: [UInt64: Double] = [:]
-        for (cell, rawScore) in rawScores {
-            guard store.tiles[cell]?.ownerId == me else { continue }
-            if let prev = liveFlushedScores[cell], abs(prev - rawScore) < liveFlushScoreEpsilon { continue }
-            delta[cell] = rawScore
-        }
-        guard !delta.isEmpty else { return }
-        for (cell, score) in delta { liveFlushedScores[cell] = score }
-        onLiveClaims(delta)
+    /// stream the raw GPS samples recorded since the last flush so the server scores
+    /// and resolves them authoritatively (REF: server-authoritative scoring). an
+    /// overlap of one sample keeps the segment straddling the flush boundary from
+    /// being dropped between batches.
+    private func flushLiveClaims() {
+        guard let onLiveClaims, let path = currentDrive?.rawPath else { return }
+        guard path.count > liveFlushedSampleCount else { return }
+        let start = max(0, liveFlushedSampleCount - 1)
+        let batch = Array(path[start...])
+        liveFlushedSampleCount = path.count
+        guard batch.count >= 2 else { return }
+        onLiveClaims(batch)
     }
 
     /// (re)compute and apply the per-tile distance-weighted scores for the drive so far, and refresh

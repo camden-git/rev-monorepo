@@ -129,9 +129,10 @@ struct RootView: View {
             .overlay(alignment: .top) { toast }
             .safeAreaInset(edge: .top) { syncStatusBanner }
             .task {
-                // stream mid-drive captures to the server so other players see them live
-                tracker.onLiveClaims = { scores in
-                    Task { await sync.flushLiveClaims(scores) }
+                // stream mid-drive GPS samples to the server so it scores + resolves
+                // them authoritatively and other players see captures live
+                tracker.onLiveClaims = { samples in
+                    Task { await sync.flushLiveClaims(samples) }
                 }
                 tracker.start()
             }
