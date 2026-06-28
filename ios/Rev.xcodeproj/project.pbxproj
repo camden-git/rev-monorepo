@@ -17,13 +17,14 @@
 		50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C0F969107087F96013E67F /* LeaderboardView.swift */; };
 		750F9185B65529585FBA4B91 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5581F52012A4971B7DF1565F /* AppleSignInButton.swift */; };
 		76D2E8C90B5B0FFB50669733 /* ProfileSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136227412603B5999AB44748 /* ProfileSettingsView.swift */; };
-		A1A0570000000000A0000002 /* AutoStartSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A0570000000000A0000001 /* AutoStartSettingsView.swift */; };
 		8C8F06F9CBBAC65E17612939 /* TileDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F23E45A1D168FC97A7B75918 /* TileDetailView.swift */; };
 		93CD44AAF31CAA09F5896AE6 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15713F2A44FA62B340F54D44 /* OnboardingView.swift */; };
 		9422689350B941F2325CCDA5 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B76981DF5A715E1D4AC6D1 /* RootView.swift */; };
 		9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */; };
+		A1A0570000000000A0000002 /* AutoStartSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A0570000000000A0000001 /* AutoStartSettingsView.swift */; };
 		A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FDC10F6072E934167CD1D7 /* ColorHex.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* ScoringExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */; };
+		A1C3D4E5F6070819203A4B6C /* UpdateRequiredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C3D4E5F6070819203A4B6D /* UpdateRequiredView.swift */; };
 		B1B3B3DF4CE62CE68F89D002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B1B3B3DF4CE62CE68F89D001 /* PrivacyInfo.xcprivacy */; };
 		BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9B7B4275284769A91EF50C5 /* RevKit */; };
 		BD993042EE13D451121A04CD /* PlayerAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */; };
@@ -35,7 +36,6 @@
 /* Begin PBXFileReference section */
 		10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriveHistoryView.swift; sourceTree = "<group>"; };
 		136227412603B5999AB44748 /* ProfileSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsView.swift; sourceTree = "<group>"; };
-		A1A0570000000000A0000001 /* AutoStartSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoStartSettingsView.swift; sourceTree = "<group>"; };
 		14FDC10F6072E934167CD1D7 /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
 		15713F2A44FA62B340F54D44 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		26711864EBD6BFBDD37E9669 /* Rev.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rev.entitlements; sourceTree = "<group>"; };
@@ -51,7 +51,9 @@
 		91A4895964A768B703C46392 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		96C64F7A6F30957F0653F624 /* RevKit */ = {isa = PBXFileReference; lastKnownFileType = folder; path = RevKit; sourceTree = SOURCE_ROOT; };
 		A14A42EEDF08D006B0DAD8C1 /* Rev.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rev.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1A0570000000000A0000001 /* AutoStartSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoStartSettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoringExplainerView.swift; sourceTree = "<group>"; };
+		A1C3D4E5F6070819203A4B6D /* UpdateRequiredView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateRequiredView.swift; sourceTree = "<group>"; };
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
 		AC0673B770485F7009C4E40F /* ViewStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewStyles.swift; sourceTree = "<group>"; };
 		B1B3B3DF4CE62CE68F89D001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -124,6 +126,7 @@
 				32B76981DF5A715E1D4AC6D1 /* RootView.swift */,
 				F23E45A1D168FC97A7B75918 /* TileDetailView.swift */,
 				A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */,
+				A1C3D4E5F6070819203A4B6D /* UpdateRequiredView.swift */,
 				AC0673B770485F7009C4E40F /* ViewStyles.swift */,
 			);
 			path = App;
@@ -231,6 +234,7 @@
 				9422689350B941F2325CCDA5 /* RootView.swift in Sources */,
 				8C8F06F9CBBAC65E17612939 /* TileDetailView.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* ScoringExplainerView.swift in Sources */,
+				A1C3D4E5F6070819203A4B6C /* UpdateRequiredView.swift in Sources */,
 				CD9D182404C3D85F06D3425A /* ViewStyles.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -374,7 +378,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
@@ -405,7 +409,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;

@@ -78,6 +78,14 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         try onInviteAuth(displayName, email, code)
     }
 
+    var onFetchVersionGate: @Sendable () throws -> AppVersionGateDTO = {
+        AppVersionGateDTO(minimumVersion: "0.0.0", latestVersion: "0.0.0")
+    }
+
+    func fetchVersionGate() async throws -> AppVersionGateDTO {
+        try onFetchVersionGate()
+    }
+
     func createDrive(_ payload: DriveUploadPayload) async throws -> DriveRecordDTO {
         lock.withLock { createdPayloads.append(payload) }
         return try onCreateDrive(payload)

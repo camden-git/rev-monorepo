@@ -17,6 +17,10 @@ public protocol PocketBaseClient: Sendable {
     /// `POST /api/rev/auth-with-invite`
     func authWithInvite(displayName: String, email: String, code: String) async throws -> AuthResponse
 
+    /// fetch the minimum-supported and latest app versions so the client can
+    /// gate older builds. unauthenticated. `GET /api/rev/version`
+    func fetchVersionGate() async throws -> AppVersionGateDTO
+
     /// upload a finished drive, creating the record fires the server resolve hook
     /// `POST /api/collections/drives/records`
     func createDrive(_ payload: DriveUploadPayload) async throws -> DriveRecordDTO

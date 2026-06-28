@@ -50,7 +50,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if store.needsOnboarding {
+            if sync.updateRequired {
+                UpdateRequiredView(latestVersion: sync.latestAvailableVersion)
+            } else if store.needsOnboarding {
                 OnboardingView(store: store, signIn: signIn, sync: sync)
             } else {
                 mapContent
@@ -59,6 +61,7 @@ struct RootView: View {
         .environment(push)
         .task {
             configurePush()
+            await sync.checkVersionGate()
             await sync.restoreSessionIfPossible()
             reconcileRealtime()
             await refreshSocial()
@@ -67,6 +70,7 @@ struct RootView: View {
         // keep the live tile stream open only while the app is active and signed in
         .onChange(of: scenePhase) { _, _ in
             reconcileRealtime()
+            if scenePhase == .active { Task { await sync.checkVersionGate() } }
             Task { await syncPushRegistration() }
         }
         .onChange(of: sync.isSignedIn) { _, _ in

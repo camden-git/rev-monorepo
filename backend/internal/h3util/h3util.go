@@ -31,6 +31,20 @@ func CellCenter(id uint64) (lat, lng float64, ok bool) {
 	return ll.Lat, ll.Lng, true
 }
 
+// Boundary returns a cell's vertex ring as [lat, lng] pairs in degrees,
+// used for drawing the hexagon as a polygon on a map
+func Boundary(id uint64) (verts [][2]float64, ok bool) {
+	b, err := h3.CellToBoundary(toCell(id))
+	if err != nil {
+		return nil, false
+	}
+	verts = make([][2]float64, len(b))
+	for i, ll := range b {
+		verts[i] = [2]float64{ll.Lat, ll.Lng}
+	}
+	return verts, true
+}
+
 // GridDistance is the grid-step distance between two cells
 func GridDistance(a, b uint64) (dist int, ok bool) {
 	d, err := h3.GridDistance(toCell(a), toCell(b))

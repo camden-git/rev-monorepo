@@ -64,6 +64,11 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         return try await send(request, decoding: AuthResponse.self)
     }
 
+    public func fetchVersionGate() async throws -> AppVersionGateDTO {
+        let request = try makeRequest(path: "/api/rev/version", method: "GET", authed: false)
+        return try await send(request, decoding: AppVersionGateDTO.self)
+    }
+
     public func createDrive(_ payload: DriveUploadPayload) async throws -> DriveRecordDTO {
         var request = try makeRequest(path: "/api/collections/drives/records", method: "POST", authed: true)
         request.httpBody = try encoder.encode(payload)

@@ -22,6 +22,7 @@ public final class SyncService {
     private let client: PocketBaseClient
     private let tokenStore: TokenStore
     private let cursor: SyncCursor
+    private let appVersion: String
     /// live tile push, nil in tests that don't exercise realtime
     private let realtime: TileRealtimeClient?
     private var realtimeActive = false
@@ -34,6 +35,8 @@ public final class SyncService {
     public private(set) var lastErrorKind: SyncErrorKind?
     public private(set) var lastDebugMessage: String?
     public private(set) var isRestoringSession = false
+    public private(set) var updateRequired = false
+    public private(set) var latestAvailableVersion: String?
     private var attemptedSessionRestore = false
     private var currentVisibleTileCells: Set<UInt64> = []
     private var currentVisibleTileParents: Set<UInt64> = []
@@ -51,7 +54,8 @@ public final class SyncService {
         context: ModelContext,
         config: PocketBaseConfig,
         tokenStore: TokenStore = InMemoryTokenStore(),
-        cursor: SyncCursor = InMemorySyncCursor()
+        cursor: SyncCursor = InMemorySyncCursor(),
+        appVersion: String = Bundle.main.appVersionString
     ) {
         self.init(
             store: store,
@@ -59,7 +63,8 @@ public final class SyncService {
             client: URLSessionPocketBaseClient(config: config, tokenStore: tokenStore),
             tokenStore: tokenStore,
             cursor: cursor,
-            realtime: PocketBaseRealtimeClient(config: config, tokenStore: tokenStore)
+            realtime: PocketBaseRealtimeClient(config: config, tokenStore: tokenStore),
+            appVersion: appVersion
         )
     }
 
@@ -70,7 +75,8 @@ public final class SyncService {
         client: PocketBaseClient,
         tokenStore: TokenStore = InMemoryTokenStore(),
         cursor: SyncCursor = InMemorySyncCursor(),
-        realtime: TileRealtimeClient? = nil
+        realtime: TileRealtimeClient? = nil,
+        appVersion: String = "0.0.0"
     ) {
         self.store = store
         self.context = context
@@ -78,6 +84,7 @@ public final class SyncService {
         self.cursor = cursor
         self.client = client
         self.realtime = realtime
+        self.appVersion = appVersion
     }
 
     public var isSignedIn: Bool { currentUserId != nil }
@@ -246,6 +253,20 @@ public final class SyncService {
             try await client.claimTiles(rawPath: rawPath)
         } catch {
             recordSyncFailure(error, operation: "flushLiveClaims", visible: false)
+        }
+    }
+
+    // MARK: version gate
+
+    /// ask the server for the minimum-supported app version and flip
+    /// `updateRequired` when this build is below it
+    public func checkVersionGate() async {
+        do {
+            let gate = try await client.fetchVersionGate()
+            latestAvailableVersion = gate.latestVersion
+            updateRequired = AppVersion(appVersion).isOlderThan(gate.minimumVersion)
+        } catch {
+            recordSyncFailure(error, operation: "checkVersionGate", visible: false)
         }
     }
 

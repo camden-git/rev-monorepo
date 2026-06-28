@@ -37,6 +37,8 @@ func main() {
 	hooks.RegisterDriveHooks(app, notifier)
 	hooks.RegisterUserHooks(app)
 	hooks.RegisterFollowHooks(app, notifier)
+	routes.RegisterVersionRoutes(app)
+	routes.RegisterAdminRoutes(app)
 	routes.RegisterInviteAuthRoutes(app)
 	routes.RegisterTileRoutes(app, notifier)
 	routes.RegisterAccountRoutes(app)

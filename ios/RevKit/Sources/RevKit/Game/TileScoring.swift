@@ -22,7 +22,7 @@ public enum TileScoring {
 
     /// fastest a segment can imply (m/s) before it's treated as a GPS teleport rather than
     /// real travel
-    static let maxSegmentSpeedMetersPerSecond = 134
+    static let maxSegmentSpeedMetersPerSecond = 134.0
 
     /// target length (m) of each sub-step a segment is broken into for tile attribution. small
     /// relative to a res-10 hex (~130 m wide) so a segment is credited to each tile in proportion
