@@ -93,6 +93,60 @@ public enum H3Grid {
         return MKMultiPolygon(from: merged)
     }
 
+    /// the cell's polygon loop, or [] if it can't be resolved
+    public static func boundary(of cellId: UInt64) -> [CLLocationCoordinate2D] {
+        guard let loop = try? H3Cell(cellId).boundary else { return [] }
+        return loop.map(\.coordinates)
+    }
+
+    /// a bounding region over all cells' boundary coordinates, padded out and floored
+    public static func region(
+        covering cellIds: [UInt64],
+        paddingFraction: Double = 0.35,
+        minSpanMeters: Double = 400
+    ) -> MKCoordinateRegion? {
+        guard !cellIds.isEmpty else { return nil }
+        var coords: [CLLocationCoordinate2D] = []
+        for id in cellIds { coords.append(contentsOf: boundary(of: id)) }
+        return region(coveringCoordinates: coords, paddingFraction: paddingFraction, minSpanMeters: minSpanMeters)
+    }
+
+    /// a bounding region over raw coordinates with padding and flooring
+    public static func region(
+        coveringCoordinates coords: [CLLocationCoordinate2D],
+        paddingFraction: Double = 0.35,
+        minSpanMeters: Double = 400
+    ) -> MKCoordinateRegion? {
+        var minLat = Double.greatestFiniteMagnitude
+        var maxLat = -Double.greatestFiniteMagnitude
+        var minLng = Double.greatestFiniteMagnitude
+        var maxLng = -Double.greatestFiniteMagnitude
+        var found = false
+
+        for coord in coords {
+            found = true
+            minLat = Swift.min(minLat, coord.latitude)
+            maxLat = Swift.max(maxLat, coord.latitude)
+            minLng = Swift.min(minLng, coord.longitude)
+            maxLng = Swift.max(maxLng, coord.longitude)
+        }
+        guard found else { return nil }
+
+        let centerLat = (minLat + maxLat) / 2
+        let centerLng = (minLng + maxLng) / 2
+
+        let minLatSpan = minSpanMeters / 111_320
+        let minLngSpan = minSpanMeters / (111_320 * Swift.max(cos(centerLat * .pi / 180), 0.000001))
+
+        let latSpan = Swift.max((maxLat - minLat) * (1 + paddingFraction), minLatSpan)
+        let lngSpan = Swift.max((maxLng - minLng) * (1 + paddingFraction), minLngSpan)
+
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
+            span: MKCoordinateSpan(latitudeDelta: latSpan, longitudeDelta: lngSpan)
+        )
+    }
+
     static func filledCellsOverlay(for cellIndices: Set<UInt64>) -> MKMultiPolygon? {
         guard !cellIndices.isEmpty else { return nil }
         let polygons = cellIndices.compactMap { id -> MKPolygon? in

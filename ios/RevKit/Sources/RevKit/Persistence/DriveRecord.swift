@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import SwiftData
 
@@ -57,5 +58,11 @@ public final class DriveRecord {
     public var summary: DriveSummary? {
         guard let summaryData else { return nil }
         return try? JSONDecoder().decode(DriveSummary.self, from: summaryData)
+    }
+
+    /// the recorded GPS path as map coordinates, used to frame the share-card map
+    /// to the whole driven route
+    public var pathCoordinates: [CLLocationCoordinate2D] {
+        rawPath.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
     }
 }

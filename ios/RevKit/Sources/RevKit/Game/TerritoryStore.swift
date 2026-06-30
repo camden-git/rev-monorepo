@@ -476,6 +476,11 @@ public final class TerritoryStore {
         )
     }
 
+    /// the player's consecutive-day drive streak from persisted drive history
+    public func driveStreak(now: Date = .now) -> DriveStreak {
+        DriveStreak.compute(driveDates: driveHistory().map(\.startedAt), now: now)
+    }
+
     /// a single row of the leaderboard: a player and how much territory they currently hold
     public struct LeaderboardEntry: Identifiable, Sendable {
         public let playerId: String

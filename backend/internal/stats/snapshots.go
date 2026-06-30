@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/camden-git/rev-monorepo/backend/internal/feed"
 	"github.com/camden-git/rev-monorepo/backend/internal/game"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -118,6 +119,9 @@ func writeSnapshot(app core.App, s Standing, now time.Time) error {
 	if err != nil {
 		return err
 	}
+
+	prevRank, prevTiles := lastSnapshot(app, s.UserID)
+
 	rec := core.NewRecord(col)
 	rec.Set("user", s.UserID)
 	rec.Set("captured_at", now)
@@ -125,7 +129,26 @@ func writeSnapshot(app core.App, s Standing, now time.Time) error {
 	rec.Set("strength", s.Strength)
 	rec.Set("score", s.Score)
 	rec.Set("rank", s.Rank)
-	return app.Save(rec)
+	if err := app.Save(rec); err != nil {
+		return err
+	}
+	feed.RecordEmpireMilestones(app, s.UserID, s.Rank, prevRank, s.TilesHeld, prevTiles, now)
+	return nil
+}
+
+// lastSnapshot returns the rank and tiles_held of the player's latest snapshot
+func lastSnapshot(app core.App, userID string) (rank, tiles int) {
+	recs, err := app.FindRecordsByFilter(
+		"empire_snapshots",
+		"user = {:u}",
+		"-captured_at",
+		1, 0,
+		dbx.Params{"u": userID},
+	)
+	if err != nil || len(recs) == 0 {
+		return 0, 0
+	}
+	return recs[0].GetInt("rank"), recs[0].GetInt("tiles_held")
 }
 
 // snapshotExistsToday reports whether the user already has a snapshot dated today

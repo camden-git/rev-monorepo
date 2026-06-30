@@ -88,42 +88,102 @@ public struct DriveBriefDTO: Decodable, Sendable, Equatable, Identifiable {
     }
 }
 
+/// the kind of activity moment in the following feed
+public enum FeedEventType: String, Decodable, Sendable, Equatable {
+    /// a completed drive: `value` = tiles driven, `prevValue` = duration seconds
+    case drive
+    /// territory taken from a rival: `value` = tiles taken, `subject*` = the displaced owner
+    case capture
+    /// a personal record: `subtype` = the record kind (see `DrivePRKind`), `value` = the record value
+    case pr
+    /// climbed the leaderboard: `value` = new rank, `prevValue` = old rank
+    case rankUp = "rank_up"
+    /// a consecutive-day streak milestone: `value` = streak length in days
+    case streak
+    /// an achievement unlock: `subtype` = the achievement id, `value` = its magnitude
+    case achievement
+    /// a type this build does not understand yet
+    case unknown
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = FeedEventType(rawValue: raw) ?? .unknown
+    }
+}
+
 /// one entry in the following feed (`GET /api/rev/feed`)
-public struct FeedItemDTO: Decodable, Sendable, Equatable, Identifiable {
-    public let driveID: String
+public struct FeedEventDTO: Decodable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let type: FeedEventType
     public let userID: String
     public let displayName: String
     public let color: String
-    public let startedAt: Date
-    public let durationSeconds: Double
-    public let tiles: Int
-
-    public var id: String { driveID }
+    public let occurredAt: Date
+    public let subtype: String
+    public let value: Double
+    public let prevValue: Double
+    public let driveID: String
+    public let subjectID: String
+    public let subjectName: String
 
     enum CodingKeys: String, CodingKey {
-        case driveID = "drive_id"
+        case id, type, color, subtype, value
         case userID = "user_id"
         case displayName = "display_name"
-        case color
-        case startedAt = "started_at"
-        case durationSeconds = "duration_seconds"
-        case tiles
+        case occurredAt = "occurred_at"
+        case prevValue = "prev_value"
+        case driveID = "drive_id"
+        case subjectID = "subject_id"
+        case subjectName = "subject_name"
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        driveID = try c.decode(String.self, forKey: .driveID)
+        id = try c.decode(String.self, forKey: .id)
+        type = try c.decodeIfPresent(FeedEventType.self, forKey: .type) ?? .unknown
         userID = try c.decodeIfPresent(String.self, forKey: .userID) ?? ""
         displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? ""
         color = try c.decodeIfPresent(String.self, forKey: .color) ?? ""
-        startedAt = SocialDate.parse(try c.decodeIfPresent(String.self, forKey: .startedAt))
-        durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds) ?? 0
-        tiles = try c.decodeIfPresent(Int.self, forKey: .tiles) ?? 0
+        occurredAt = SocialDate.parse(try c.decodeIfPresent(String.self, forKey: .occurredAt))
+        subtype = try c.decodeIfPresent(String.self, forKey: .subtype) ?? ""
+        value = try c.decodeIfPresent(Double.self, forKey: .value) ?? 0
+        prevValue = try c.decodeIfPresent(Double.self, forKey: .prevValue) ?? 0
+        driveID = try c.decodeIfPresent(String.self, forKey: .driveID) ?? ""
+        subjectID = try c.decodeIfPresent(String.self, forKey: .subjectID) ?? ""
+        subjectName = try c.decodeIfPresent(String.self, forKey: .subjectName) ?? ""
+    }
+
+    public init(
+        id: String,
+        type: FeedEventType,
+        userID: String,
+        displayName: String,
+        color: String,
+        occurredAt: Date,
+        subtype: String = "",
+        value: Double = 0,
+        prevValue: Double = 0,
+        driveID: String = "",
+        subjectID: String = "",
+        subjectName: String = ""
+    ) {
+        self.id = id
+        self.type = type
+        self.userID = userID
+        self.displayName = displayName
+        self.color = color
+        self.occurredAt = occurredAt
+        self.subtype = subtype
+        self.value = value
+        self.prevValue = prevValue
+        self.driveID = driveID
+        self.subjectID = subjectID
+        self.subjectName = subjectName
     }
 }
 
 struct FeedResponse: Decodable, Sendable {
-    let items: [FeedItemDTO]
+    let items: [FeedEventDTO]
 }
 
 /// tolerant parse of a PocketBase datetime string

@@ -116,7 +116,13 @@ struct HomeDrawer: View {
         }
         .sheet(isPresented: $showSummary) {
             if let summary = tracker.lastDriveSummary {
-                DriveSummaryView(summary: summary, store: store) { showSummary = false }
+                DriveSummaryView(
+                    summary: summary,
+                    store: store,
+                    newRecords: tracker.lastDrivePRs,
+                    streak: store.driveStreak(),
+                    drivePath: tracker.lastDrivePath
+                ) { showSummary = false }
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
@@ -330,7 +336,7 @@ struct HomeDrawer: View {
                 }
                 .sheet(item: $selectedDrive) { record in
                     if let summary = record.summary {
-                        DriveSummaryView(summary: summary, store: store) { selectedDrive = nil }
+                        DriveSummaryView(summary: summary, store: store, drivePath: record.pathCoordinates) { selectedDrive = nil }
                             .presentationDetents([.medium, .large])
                             .presentationDragIndicator(.visible)
                     }

@@ -24,6 +24,22 @@ struct H3GridTests {
             ) == [visibleCell]
         )
     }
+
+    @Test
+    func boundaryAndRegionForKnownCell() throws {
+        let cell: UInt64 = 0x8a2a1072b59ffff
+        let loop = H3Grid.boundary(of: cell)
+        #expect(loop.count >= 6)
+
+        let region = try #require(H3Grid.region(covering: [cell]))
+        #expect(region.span.latitudeDelta > 0)
+        #expect(region.span.longitudeDelta > 0)
+    }
+
+    @Test
+    func regionIsNilForEmptyInput() {
+        #expect(H3Grid.region(covering: []) == nil)
+    }
 }
 
 private extension MKMapRect {

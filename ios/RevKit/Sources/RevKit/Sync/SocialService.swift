@@ -23,7 +23,7 @@ public final class SocialService {
     public private(set) var followers: [FollowEdge] = []
     public private(set) var incomingRequests: [FollowEdge] = []
     public private(set) var outgoingRequests: [FollowEdge] = []
-    public private(set) var feed: [FeedItemDTO] = []
+    public private(set) var feed: [FeedEventDTO] = []
     public private(set) var lastError: String?
 
     public init(client: PocketBaseClient) {

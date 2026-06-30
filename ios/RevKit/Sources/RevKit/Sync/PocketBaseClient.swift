@@ -57,9 +57,10 @@ public protocol PocketBaseClient: Sendable {
     /// `GET /api/rev/profile/{userId}/stats`
     func fetchStats(userId: String) async throws -> [EmpireSnapshotDTO]
 
-    /// recent drives from the people the signed-in user follows
+    /// the following feed: a mix of activity moments (drives, captures, PRs,
+    /// rank-ups, streaks, achievements) from the people the signed-in user follows
     /// `GET /api/rev/feed`
-    func fetchFeed() async throws -> [FeedItemDTO]
+    func fetchFeed() async throws -> [FeedEventDTO]
 
     /// every follow edge the signed-in user is part of, players expanded
     /// `GET /api/collections/follows/records`

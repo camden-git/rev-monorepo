@@ -98,14 +98,7 @@ struct ActivityFeedView: View {
                             fallbackColor: item.color
                         )
                     } label: {
-                        ActivityRow(
-                            colorHex: item.color,
-                            name: item.displayName,
-                            startedAt: item.startedAt,
-                            durationSeconds: item.durationSeconds,
-                            tiles: item.tiles,
-                            showName: true
-                        )
+                        FeedEventRow(event: item)
                     }
                 }
             }
@@ -123,7 +116,7 @@ struct ActivityFeedView: View {
                 .foregroundStyle(.secondary)
             Text("No activity yet")
                 .font(.headline)
-            Text("Follow other drivers to see their drives roll in here.")
+            Text("Follow other drivers to see their drives, captures, records, and milestones roll in here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -333,5 +326,127 @@ struct FindPeopleView: View {
             ? roster
             : roster.filter { $0.displayName.localizedCaseInsensitiveContains(trimmed) }
         return pool.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+}
+
+/// one heterogeneous moment in the following feed
+struct FeedEventRow: View {
+    let event: FeedEventDTO
+
+    var body: some View {
+        let p = FeedEventPresentation(event)
+        HStack(spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
+                PlayerAvatar(colorHex: event.color, name: event.displayName, size: 38)
+                Image(systemName: p.glyph)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(4)
+                    .background(p.tint, in: Circle())
+                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1.5))
+                    .offset(x: 4, y: 4)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.displayName.isEmpty ? "Player" : event.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(p.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Text(event.occurredAt, format: .dateTime.weekday().month().day().hour().minute())
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 8)
+            if let metric = p.metric {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(metric.value)
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(p.tint)
+                    if !metric.unit.isEmpty {
+                        Text(metric.unit)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct FeedEventPresentation {
+    let glyph: String
+    let tint: Color
+    let message: String
+    let metric: (value: String, unit: String)?
+
+    init(_ e: FeedEventDTO) {
+        switch e.type {
+        case .drive:
+            glyph = "flag.checkered"
+            tint = Color(hex: e.color)
+            let tiles = Int(e.value)
+            message = e.prevValue > 0 ? "Drove for \(SocialFormat.duration(e.prevValue))" : "Completed a drive"
+            metric = (String(tiles), Self.hexes(tiles))
+        case .capture:
+            glyph = "bolt.fill"
+            tint = .orange
+            let n = Int(e.value)
+            let who = e.subjectName.isEmpty ? "a rival" : e.subjectName
+            message = "Captured \(n) \(Self.hexes(n)) from \(who)"
+            metric = (String(n), "taken")
+        case .pr:
+            glyph = DrivePRKind(rawValue: e.subtype)?.systemImage ?? "rosette"
+            tint = .yellow
+            message = "New record · \(DrivePRKind(rawValue: e.subtype)?.title ?? "Personal best")"
+            metric = Self.prMetric(e)
+        case .rankUp:
+            glyph = "chart.line.uptrend.xyaxis"
+            tint = .green
+            let rank = Int(e.value)
+            message = e.prevValue > 0 ? "Climbed to #\(rank) (from #\(Int(e.prevValue)))" : "Climbed to #\(rank)"
+            metric = ("#\(rank)", "rank")
+        case .streak:
+            glyph = "flame.fill"
+            tint = .red
+            let days = Int(e.value)
+            message = "\(days)-day driving streak!"
+            metric = (String(days), "days")
+        case .achievement:
+            glyph = "trophy.fill"
+            tint = .purple
+            message = Self.achievementMessage(e)
+            metric = nil
+        case .unknown:
+            glyph = "sparkles"
+            tint = .secondary
+            message = "New activity"
+            metric = nil
+        }
+    }
+
+    private static func hexes(_ n: Int) -> String { n == 1 ? "hex" : "hexes" }
+
+    private static func prMetric(_ e: FeedEventDTO) -> (value: String, unit: String)? {
+        switch DrivePRKind(rawValue: e.subtype) {
+        case .distance:
+            return (String(format: "%.1f", e.value / 1609.344), "mi")
+        case .duration:
+            return (SocialFormat.duration(e.value), "")
+        case .tilesDriven, .tilesGained, .tilesCaptured:
+            return (String(Int(e.value)), "hexes")
+        case .none:
+            return nil
+        }
+    }
+
+    private static func achievementMessage(_ e: FeedEventDTO) -> String {
+        switch e.subtype {
+        case "first_drive": return "Unlocked: First drive"
+        case "first_capture": return "Unlocked: First capture"
+        case "tiles_held": return "Empire reached \(Int(e.value)) tiles"
+        default: return "Achievement unlocked"
+        }
     }
 }

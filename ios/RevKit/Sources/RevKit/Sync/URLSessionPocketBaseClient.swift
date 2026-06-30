@@ -141,7 +141,7 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         return try await send(request, decoding: StatsResponse.self).items
     }
 
-    public func fetchFeed() async throws -> [FeedItemDTO] {
+    public func fetchFeed() async throws -> [FeedEventDTO] {
         let request = try makeRequest(path: "/api/rev/feed", method: "GET", authed: true)
         return try await send(request, decoding: FeedResponse.self).items
     }

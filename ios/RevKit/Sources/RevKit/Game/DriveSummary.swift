@@ -45,6 +45,9 @@ public struct DriveSummary: Codable, Equatable, Sendable {
     public var averageScore: Double
     /// fastest scored tile this drive (mph)
     public var peakScore: Double
+    /// h3 cell ids the player NEWLY gained this drive (claimed + captured + enclosed; not reinforced),
+    /// sorted ascending
+    public var gainedCells: [UInt64]
 
     public init(
         tilesClaimed: Int = 0,
@@ -54,7 +57,8 @@ public struct DriveSummary: Codable, Equatable, Sendable {
         distanceMeters: Double = 0,
         movingTime: TimeInterval = 0,
         averageScore: Double = 0,
-        peakScore: Double = 0
+        peakScore: Double = 0,
+        gainedCells: [UInt64] = []
     ) {
         self.tilesClaimed = tilesClaimed
         self.capturedByOpponent = capturedByOpponent
@@ -64,6 +68,26 @@ public struct DriveSummary: Codable, Equatable, Sendable {
         self.movingTime = movingTime
         self.averageScore = averageScore
         self.peakScore = peakScore
+        self.gainedCells = gainedCells
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case tilesClaimed, capturedByOpponent, tilesReinforced, tilesEnclosed
+        case distanceMeters, movingTime, averageScore, peakScore, gainedCells
+    }
+
+    /// custom decode so drives persisted before `gainedCells` existed still decode (defaults to `[]`)
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tilesClaimed = try c.decode(Int.self, forKey: .tilesClaimed)
+        capturedByOpponent = try c.decode([String: Int].self, forKey: .capturedByOpponent)
+        tilesReinforced = try c.decode(Int.self, forKey: .tilesReinforced)
+        tilesEnclosed = try c.decode(Int.self, forKey: .tilesEnclosed)
+        distanceMeters = try c.decode(Double.self, forKey: .distanceMeters)
+        movingTime = try c.decode(TimeInterval.self, forKey: .movingTime)
+        averageScore = try c.decode(Double.self, forKey: .averageScore)
+        peakScore = try c.decode(Double.self, forKey: .peakScore)
+        gainedCells = try c.decodeIfPresent([UInt64].self, forKey: .gainedCells) ?? []
     }
 
     public var totalCaptured: Int { capturedByOpponent.values.reduce(0, +) }
@@ -114,20 +138,25 @@ public struct DriveSummary: Codable, Equatable, Sendable {
             peakScore: metrics.peakScore
         )
 
+        var gained: [UInt64] = []
         for change in changes where change.finalOwner == localPlayerId {
             switch change.provenance {
             case .enclosure:
                 summary.tilesEnclosed += 1
+                gained.append(change.cell)
             case .direct:
                 if change.previousOwner == nil {
                     summary.tilesClaimed += 1
+                    gained.append(change.cell)
                 } else if change.previousOwner == localPlayerId {
                     summary.tilesReinforced += 1
                 } else if let opponent = change.previousOwner {
                     summary.capturedByOpponent[opponent, default: 0] += 1
+                    gained.append(change.cell)
                 }
             }
         }
+        summary.gainedCells = gained.sorted()
 
         return summary
     }

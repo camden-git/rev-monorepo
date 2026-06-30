@@ -43,14 +43,20 @@ type driveBrief struct {
 	Tiles           int     `json:"tiles"`
 }
 
+// feedItem is one heterogeneous activity moment
 type feedItem struct {
-	DriveID         string  `json:"drive_id"`
-	UserID          string  `json:"user_id"`
-	DisplayName     string  `json:"display_name"`
-	Color           string  `json:"color"`
-	StartedAt       string  `json:"started_at"`
-	DurationSeconds float64 `json:"duration_seconds"`
-	Tiles           int     `json:"tiles"`
+	ID          string  `json:"id"`
+	Type        string  `json:"type"`
+	UserID      string  `json:"user_id"`
+	DisplayName string  `json:"display_name"`
+	Color       string  `json:"color"`
+	OccurredAt  string  `json:"occurred_at"`
+	Subtype     string  `json:"subtype,omitempty"`
+	Value       float64 `json:"value"`
+	PrevValue   float64 `json:"prev_value"`
+	DriveID     string  `json:"drive_id,omitempty"`
+	SubjectID   string  `json:"subject_id,omitempty"`
+	SubjectName string  `json:"subject_name,omitempty"`
 }
 
 type feedResponse struct {
@@ -190,47 +196,75 @@ func feed(e *core.RequestEvent) error {
 	}
 
 	ids := make([]any, 0, len(edges))
-	users := map[string]*core.Record{}
 	for _, edge := range edges {
-		id := edge.GetString("followee")
-		ids = append(ids, id)
-		if u, uerr := e.App.FindRecordById("users", id); uerr == nil {
-			users[id] = u
-		}
+		ids = append(ids, edge.GetString("followee"))
 	}
 
-	drivesCol, err := e.App.FindCollectionByNameOrId("drives")
+	eventsCol, err := e.App.FindCollectionByNameOrId("feed_events")
 	if err != nil {
-		return e.InternalServerError("Failed to load drives.", err)
+		return e.InternalServerError("Failed to load feed.", err)
 	}
 	records := []*core.Record{}
-	if err := e.App.RecordQuery(drivesCol).
-		AndWhere(dbx.In("user", ids...)).
-		OrderBy("started_at DESC").
+	if err := e.App.RecordQuery(eventsCol).
+		AndWhere(dbx.In("actor", ids...)).
+		OrderBy("occurred_at DESC").
 		Limit(maxFeedItems).
 		All(&records); err != nil {
 		return e.InternalServerError("Failed to load feed.", err)
 	}
 
+	// resolve the players referenced by these events once (actors + capture
+	// subjects) so each row carries a name and color without an N+1 fan-out.
+	names := userLookup(e.App, records)
+
 	items := make([]feedItem, 0, len(records))
-	for _, d := range records {
-		uid := d.GetString("user")
-		name, color := "", ""
-		if u := users[uid]; u != nil {
-			name = u.GetString("display_name")
-			color = u.GetString("color")
+	for _, ev := range records {
+		actor := ev.GetString("actor")
+		item := feedItem{
+			ID:          ev.Id,
+			Type:        ev.GetString("type"),
+			UserID:      actor,
+			DisplayName: names[actor].name,
+			Color:       names[actor].color,
+			OccurredAt:  ev.GetString("occurred_at"),
+			Subtype:     ev.GetString("subtype"),
+			Value:       ev.GetFloat("value"),
+			PrevValue:   ev.GetFloat("prev_value"),
+			DriveID:     ev.GetString("drive"),
 		}
-		items = append(items, feedItem{
-			DriveID:         d.Id,
-			UserID:          uid,
-			DisplayName:     name,
-			Color:           color,
-			StartedAt:       d.GetString("started_at"),
-			DurationSeconds: driveDuration(d),
-			Tiles:           driveTileCount(d),
-		})
+		if subject := ev.GetString("subject"); subject != "" {
+			item.SubjectID = subject
+			item.SubjectName = names[subject].name
+		}
+		items = append(items, item)
 	}
 	return e.JSON(http.StatusOK, feedResponse{Items: items})
+}
+
+type playerName struct {
+	name  string
+	color string
+}
+
+// userLookup resolves every actor and subject referenced by the feed events to
+// their display name and color in one pass
+func userLookup(app core.App, events []*core.Record) map[string]playerName {
+	out := map[string]playerName{}
+	want := map[string]bool{}
+	for _, ev := range events {
+		if a := ev.GetString("actor"); a != "" {
+			want[a] = true
+		}
+		if s := ev.GetString("subject"); s != "" {
+			want[s] = true
+		}
+	}
+	for id := range want {
+		if u, err := app.FindRecordById("users", id); err == nil {
+			out[id] = playerName{name: u.GetString("display_name"), color: u.GetString("color")}
+		}
+	}
+	return out
 }
 
 // MARK: helpers

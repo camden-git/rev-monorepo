@@ -25,6 +25,11 @@ public final class DriveTracker {
     /// provisional recap of the most recently finished drive, drives the post-drive summary UI
     /// nil while a drive is in progress (cleared when a new drive begins)
     public private(set) var lastDriveSummary: DriveSummary?
+    /// the just-finished drive's outlier-filtered path as map coordinates
+    public private(set) var lastDrivePath: [CLLocationCoordinate2D] = []
+
+    /// personal records set by the most recently finished drive (empty if none / first drive)
+    public private(set) var lastDrivePRs: [DrivePRKind] = []
 
     /// live HUD: the tile currently being driven on
     /// cleared when the drive ends
@@ -214,6 +219,8 @@ public final class DriveTracker {
         contestedOwnerName = nil
         contestedScore = nil
         lastDriveSummary = nil
+        lastDrivePath = []
+        lastDrivePRs = []
         driveDistanceMeters = 0
         lastLiveRescore = .distantPast
         liveFlushedSampleCount = 0
@@ -338,6 +345,10 @@ public final class DriveTracker {
 
         let summary = buildSummary(perTileScores: finalScores, cleaned: cleaned)
         lastDriveSummary = summary
+        lastDrivePath = cleaned.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+
+        let prior = store.driveHistory().compactMap(\.summary)
+        lastDrivePRs = DrivePRs.newRecords(for: summary, against: prior)
 
         // persist the finished drive + its provisional summary (uploaded = false), the future
         // backend upload reads from here and returns the authoritative result

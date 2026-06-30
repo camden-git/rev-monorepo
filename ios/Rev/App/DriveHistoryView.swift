@@ -32,11 +32,14 @@ struct DriveHistoryView: View {
 
     private var content: some View {
         let drives = store.driveHistory()
+        let summaries = drives.compactMap(\.summary)
         let stats = EmpireStats.compute(
             tiles: Array(store.tiles.values),
             ownedBy: store.localPlayer.id,
-            driveSummaries: drives.compactMap(\.summary)
+            driveSummaries: summaries
         )
+        let streak = store.driveStreak()
+        let bests = DrivePRs.bests(from: summaries)
 
         return List {
                 Section {
@@ -75,6 +78,27 @@ struct DriveHistoryView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    if streak.current >= 1 || streak.longest >= 1 {
+                        LabeledContent("🔥 Streak") {
+                            Text(streakText(streak))
+                                .monospacedDigit()
+                                .foregroundStyle(streak.current >= 1 ? .orange : .secondary)
+                        }
+                    }
+                }
+
+                if !bests.isEmpty {
+                    Section("Personal Records") {
+                        ForEach(DrivePRKind.allCases, id: \.self) { kind in
+                            if let value = bests[kind] {
+                                LabeledContent {
+                                    Text(bestValueText(kind, value)).monospacedDigit()
+                                } label: {
+                                    Label(kind.title, systemImage: kind.systemImage)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if drives.isEmpty {
@@ -92,7 +116,7 @@ struct DriveHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedDrive) { record in
             if let summary = record.summary {
-                DriveSummaryView(summary: summary, store: store) { selectedDrive = nil }
+                DriveSummaryView(summary: summary, store: store, drivePath: record.pathCoordinates) { selectedDrive = nil }
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
@@ -170,5 +194,22 @@ struct DriveHistoryView: View {
     private func lifetimeDistanceText(for stats: EmpireStats) -> String {
         let miles = stats.lifetimeDistanceMeters / 1609.344
         return String(format: "%.1f mi", miles)
+    }
+
+    private func streakText(_ streak: DriveStreak) -> String {
+        "\(streak.current) day · best \(streak.longest)"
+    }
+
+    /// format a personal-record value: tiles as integers, distance in miles, duration as m:ss
+    private func bestValueText(_ kind: DrivePRKind, _ value: Double) -> String {
+        switch kind {
+        case .tilesDriven, .tilesGained, .tilesCaptured:
+            return "\(Int(value))"
+        case .distance:
+            return String(format: "%.1f mi", value / 1609.344)
+        case .duration:
+            let total = Int(value.rounded())
+            return String(format: "%d:%02d", total / 60, total % 60)
+        }
     }
 }

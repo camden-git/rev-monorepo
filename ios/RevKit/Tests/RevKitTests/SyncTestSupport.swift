@@ -129,7 +129,7 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
 
     func fetchStats(userId: String) async throws -> [EmpireSnapshotDTO] { [] }
 
-    func fetchFeed() async throws -> [FeedItemDTO] { [] }
+    func fetchFeed() async throws -> [FeedEventDTO] { [] }
 
     func listFollows() async throws -> [FollowRecordDTO] { [] }
 
