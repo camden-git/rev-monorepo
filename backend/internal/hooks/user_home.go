@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/camden-git/rev-monorepo/backend/internal/game"
+	"github.com/camden-git/rev-monorepo/backend/internal/geofence"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -29,6 +30,9 @@ func syncHomeTile(app core.App, user *core.Record) error {
 	home, err := strconv.ParseUint(homeStr, 10, 64)
 	if err != nil || home == 0 {
 		return nil // no home chosen yet, nothing to mark
+	}
+	if !geofence.ContainsCell(home) {
+		return nil // Rev is only played in Chicago
 	}
 
 	return app.RunInTransaction(func(txApp core.App) error {

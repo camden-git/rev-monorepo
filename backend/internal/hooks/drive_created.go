@@ -8,6 +8,7 @@ import (
 
 	"github.com/camden-git/rev-monorepo/backend/internal/feed"
 	"github.com/camden-git/rev-monorepo/backend/internal/game"
+	"github.com/camden-git/rev-monorepo/backend/internal/geofence"
 	"github.com/camden-git/rev-monorepo/backend/internal/h3util"
 	"github.com/camden-git/rev-monorepo/backend/internal/notify"
 	"github.com/camden-git/rev-monorepo/backend/internal/stats"
@@ -209,6 +210,10 @@ func ResolveDirectClaims(app core.App, userID string, samples []game.Sample, now
 // the id of the owner displaced on a capture ("" when none), and how the claim
 // resolved (so callers can tally newly-won ground)
 func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now time.Time) (bool, float64, string, game.OutcomeKind, error) {
+	// Rev is only played in Chicago
+	if !geofence.ContainsCell(h3) {
+		return false, 0, "", game.NoChange, nil
+	}
 	h3str := strconv.FormatUint(h3, 10)
 	existing := findTile(txApp, h3str)
 
@@ -359,6 +364,10 @@ func resolveEnclosure(
 }
 
 func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength float64, now time.Time) (bool, float64, string, game.OutcomeKind, error) {
+	// Rev is only played in Chicago
+	if !geofence.ContainsCell(h3) {
+		return false, 0, "", game.NoChange, nil
+	}
 	h3str := strconv.FormatUint(h3, 10)
 	existing := findTile(txApp, h3str)
 
