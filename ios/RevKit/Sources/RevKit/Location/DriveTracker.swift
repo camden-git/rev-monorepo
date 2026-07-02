@@ -103,7 +103,7 @@ public final class DriveTracker {
         self.authorizationStatus = locationManager.authorizationStatus
         delegate.tracker = self
         locationManager.delegate = delegate
-        locationManager.activityType = .otherNavigation
+        locationManager.activityType = .automotiveNavigation
         locationManager.pausesLocationUpdatesAutomatically = false
     }
 

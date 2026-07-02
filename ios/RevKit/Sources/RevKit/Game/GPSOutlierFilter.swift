@@ -3,14 +3,19 @@ import Foundation
 
 /// cleans a raw GPS path before scoring, this will eventually be server side
 /// REF: docs/game-design.md §Raw GPS Outlier Filter:
-///   1. reject GPS "teleport" spikes by geometry (a glitch fix flings away and snaps back)
-///   2. reject any sample w/ >1g sustained acceleration vs. the prior retained sample
-///   3. apply smoothing to the remaining samples' reported speeds
+///   1. drop fixes the device flags as too inaccurate to trust
+///   2. reject GPS "teleport" spikes by geometry (a glitch fix flings away and snaps back)
+///   3. reject any sample w/ >1g sustained acceleration vs. the prior retained sample
+///   4. apply smoothing to the remaining samples' reported speeds
 ///
 /// note: never put any speed cap!
 public enum GPSOutlierFilter {
     /// the rejection threshold for implied acceleration in m/s/s
     static let maxAcceleration = 9.80665
+
+    /// the coarsest fix worth trusting in meters; beyond it the position can be off
+    /// far enough to manufacture phantom speed
+    static let maxHorizontalAccuracyMeters = 35.0
 
     static let smoothingWindow = 3
 
@@ -23,8 +28,16 @@ public enum GPSOutlierFilter {
     static let spikeDetourRatio = 4.0
 
     public static func filterOutliers(_ samples: [GPSSample]) -> [GPSSample] {
-        guard samples.count > 2 else { return samples }
-        return smoothSpeeds(rejectAccelerationOutliers(rejectPositionSpikes(samples)))
+        let trusted = rejectLowAccuracy(samples)
+        guard trusted.count > 2 else { return trusted }
+        return smoothSpeeds(rejectAccelerationOutliers(rejectPositionSpikes(trusted)))
+    }
+
+    /// drop fixes CoreLocation marks untrustworthy: a negative accuracy means the
+    /// coordinate is invalid, a large one means the position can be off far enough
+    /// that the distance to the next fix implies a speed that never happened
+    static func rejectLowAccuracy(_ samples: [GPSSample]) -> [GPSSample] {
+        samples.filter { $0.accuracy >= 0 && $0.accuracy <= maxHorizontalAccuracyMeters }
     }
 
     static func rejectPositionSpikes(_ samples: [GPSSample]) -> [GPSSample] {

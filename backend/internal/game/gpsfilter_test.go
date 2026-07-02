@@ -6,14 +6,23 @@ import (
 	"time"
 )
 
+// at builds a sample with an invalid Doppler speed (-1) so PerTileScores falls
+// back to its position-derived speed
 func at(sec float64, lat, lng float64) Sample {
 	base := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
 	return Sample{
 		TS:    base.Add(time.Duration(sec * float64(time.Second))),
 		Lat:   lat,
 		Lng:   lng,
-		Speed: 0,
+		Speed: -1,
 	}
+}
+
+// atSpeed is at with an explicit Doppler speed (m/s) attached to the fix
+func atSpeed(sec float64, lat, lng, speed float64) Sample {
+	s := at(sec, lat, lng)
+	s.Speed = speed
+	return s
 }
 
 // distanceMeters should be within ~0.5% of a known great-circle distance

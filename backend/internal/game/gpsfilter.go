@@ -7,10 +7,11 @@ import (
 
 // Sample is one raw GPS fix from a drive's raw_path
 type Sample struct {
-	TS    time.Time
-	Lat   float64
-	Lng   float64
-	Speed float64 // m/s as reported by CoreLocation, negative when invalid
+	TS       time.Time
+	Lat      float64
+	Lng      float64
+	Speed    float64 // m/s as reported by CoreLocation, negative when invalid
+	Accuracy float64 // horizontal accuracy in meters, negative when the fix is invalid
 }
 
 // GPS outlier-filter constants
@@ -25,6 +26,9 @@ const (
 	// spikeDetourRatio is how much longer the in-and-out detour through a fix
 	// must be than the straight hop past it before it's treated as a spike
 	spikeDetourRatio = 4.0
+	// maxHorizontalAccuracyMeters is the coarsest fix worth trusting; beyond it
+	// the position can be off far enough to manufacture phantom speed
+	maxHorizontalAccuracyMeters = 35.0
 )
 
 // earthRadiusMeters is the mean Earth radius used for the server's haversine
@@ -32,14 +36,31 @@ const (
 const earthRadiusMeters = 6371000.0
 
 // FilterOutliers cleans a raw GPS path before scoring
-//  1. reject GPS teleport spikes by geometry
-//  2. reject any sample implying >1g sustained acceleration vs. the prior retained sample
-//  3. smooth the remaining samples' reported speeds
+//  1. drop fixes the device flags as too inaccurate to trust
+//  2. reject GPS teleport spikes by geometry
+//  3. reject any sample implying >1g sustained acceleration vs. the prior retained sample
+//  4. smooth the remaining samples' reported speeds
 func FilterOutliers(samples []Sample) []Sample {
+	samples = rejectLowAccuracy(samples)
 	if len(samples) <= 2 {
 		return samples
 	}
 	return smoothSpeeds(rejectAccelerationOutliers(rejectPositionSpikes(samples)))
+}
+
+// rejectLowAccuracy drops fixes CoreLocation marks untrustworthy: a negative
+// accuracy means the coordinate is invalid, a large one means the position can
+// be far enough off that the distance to the next fix implies a speed that never
+// happened
+func rejectLowAccuracy(samples []Sample) []Sample {
+	kept := make([]Sample, 0, len(samples))
+	for _, s := range samples {
+		if s.Accuracy < 0 || s.Accuracy > maxHorizontalAccuracyMeters {
+			continue
+		}
+		kept = append(kept, s)
+	}
+	return kept
 }
 
 func rejectPositionSpikes(samples []Sample) []Sample {

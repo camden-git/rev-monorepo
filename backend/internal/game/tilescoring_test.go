@@ -56,6 +56,48 @@ func TestPerTileScoresMatchesSteadySpeed(t *testing.T) {
 	}
 }
 
+func TestPerTileScoresPrefersDopplerOverJitteryPositions(t *testing.T) {
+	const trueSpeed = 29.0 // m/s, ~65 mph
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		lat := 41.8800
+		if i%2 == 1 {
+			lat += 0.0004 // ~44 m of lateral GPS wander
+		}
+		lng := -87.6300 + 0.00035*float64(i) // ~29 m/s eastward
+		samples = append(samples, atSpeed(float64(i), lat, lng, trueSpeed))
+	}
+
+	scores := PerTileScores(samples)
+	if len(scores) == 0 {
+		t.Fatal("expected at least one scored tile")
+	}
+	wantMph := trueSpeed * MphPerMetersPerSecond // ~64.9
+	for tile, mph := range scores {
+		if mph < wantMph-4 || mph > wantMph+4 {
+			t.Fatalf("tile %d scored %.1f mph, want ~%.1f from Doppler; position jitter must not inflate it", tile, mph, wantMph)
+		}
+	}
+}
+
+// with no valid Doppler reading the scorer falls back to position-derived speed
+func TestPerTileScoresFallsBackToPositionWithoutDoppler(t *testing.T) {
+	// 0.0002 deg longitude per second at lat 41.88 is ~16.5 m/s (~37 mph)
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		samples = append(samples, at(float64(i), 41.8800, -87.6300+0.0002*float64(i))) // Speed: -1
+	}
+	scores := PerTileScores(samples)
+	if len(scores) == 0 {
+		t.Fatal("expected at least one scored tile")
+	}
+	for tile, mph := range scores {
+		if mph < 34 || mph > 40 {
+			t.Fatalf("tile %d scored %.1f mph, want ~37 from position fallback", tile, mph)
+		}
+	}
+}
+
 // a path whose every segment is below the stopped-speed threshold earns no
 // tile scores
 func TestPerTileScoresIgnoresStoppedPath(t *testing.T) {

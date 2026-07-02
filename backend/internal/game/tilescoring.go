@@ -41,8 +41,9 @@ func Cell(lat, lng float64) (uint64, bool) {
 	return h3util.LatLngToCell(lat, lng)
 }
 
-// PerTileScores computes the per-tile claim score (distance-weighted average
-// speed while moving, in mph) for each res-10 cell a filtered path crosses
+// PerTileScores computes the per-tile claim score (time-weighted average speed
+// while moving, in mph) for each res-10 cell a filtered path crosses. Segment
+// speed comes from the device's Doppler reading when valid
 func PerTileScores(samples []Sample) map[uint64]float64 {
 	if len(samples) <= 1 {
 		return map[uint64]float64{}
@@ -50,6 +51,8 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 
 	distanceByTile := map[uint64]float64{}
 	movingTimeByTile := map[uint64]float64{}
+
+	speedTimeByTile := map[uint64]float64{}
 
 	for i := 0; i+1 < len(samples); i++ {
 		a, b := samples[i], samples[i+1]
@@ -64,6 +67,18 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 		}
 		if segmentSpeed > maxSegmentSpeed {
 			continue // GPS teleport: don't interpolate a line between far-apart fixes
+		}
+
+		// score from the device's Doppler speed when both endpoints report a
+		// valid reading. Doppler speed is far steadier than differentiating GPS
+		// positions, which multipath (e.g. downtown urban canyons) inflates: a
+		// gradual position wander only ever adds apparent path length and reads
+		// as phantom speed, yet is too smooth to trip the spike/acceleration
+		// filters. fall back to the position-derived speed when Doppler is
+		// unavailable (negative CoreLocation speed = invalid fix).
+		scoreSpeed := segmentSpeed
+		if a.Speed >= 0 && b.Speed >= 0 {
+			scoreSpeed = (a.Speed + b.Speed) / 2
 		}
 
 		// walk the segment in small steps and attribute each step's distance/time
@@ -87,6 +102,7 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 			}
 			distanceByTile[tile] += stepDistance
 			movingTimeByTile[tile] += stepTime
+			speedTimeByTile[tile] += scoreSpeed * stepTime
 		}
 	}
 
@@ -99,7 +115,7 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 		if movingTime <= 0 {
 			continue
 		}
-		scores[tile] = (distance / movingTime) * MphPerMetersPerSecond
+		scores[tile] = (speedTimeByTile[tile] / movingTime) * MphPerMetersPerSecond
 	}
 	return scores
 }

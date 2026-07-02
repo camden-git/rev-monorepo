@@ -2,11 +2,13 @@ import CoreLocation
 import Foundation
 import SwiftyH3
 
-/// computes the per-tile claim score (distance-weighted average speed while moving) from
+/// computes the per-tile claim score (time-weighted average speed while moving) from
 /// a (filtered) GPS path per H3 res-10 cell. Mirrors the server math in REF:docs/game-design.md
 /// §Score Metric
 ///
-/// score(tile) = Σ distance moved inside the tile / Σ time spent moving inside the tile, where "moving"
+/// score(tile) = Σ speed·time spent moving inside the tile / Σ time spent moving inside the tile.
+/// Segment speed is the device's Doppler reading (`CLLocation.speed`) when valid, falling back to
+/// the position-derived speed (Δdistance / Δtime) otherwise
 ///
 /// Returned in **mph**; Score Metric v2 converts this raw speed into claim strength.
 public enum TileScoring {
@@ -43,6 +45,10 @@ public enum TileScoring {
 
         var distanceByTile: [UInt64: Double] = [:]
         var movingTimeByTile: [UInt64: Double] = [:]
+        // scored speed integrated over time (Σ speed·time, in metres). dividing by moving time gives
+        // the tile's time-weighted average speed. kept separate from the raw geometric distance
+        // because the scored speed comes from the device's Doppler reading, not the position deltas.
+        var speedTimeByTile: [UInt64: Double] = [:]
 
         for (a, b) in zip(samples, samples.dropFirst()) {
             let dt = b.timestamp.timeIntervalSince(a.timestamp)
@@ -53,6 +59,8 @@ public enum TileScoring {
             guard segmentSpeed >= stoppedSpeedMetersPerSecond else { continue }
             // a GPS teleport: don't interpolate a line between two far-apart fixes
             guard segmentSpeed <= maxSegmentSpeedMetersPerSecond else { continue }
+
+            let scoreSpeed = (a.speed >= 0 && b.speed >= 0) ? (a.speed + b.speed) / 2 : segmentSpeed
 
             // walk the segment in small steps and attribute each step's distance/time to the tile
             // it falls in. this keeps a barely-clipped tile from inheriting a whole segment's worth
@@ -67,6 +75,7 @@ public enum TileScoring {
                 guard let tile = cell(lat: lat, lng: lng) else { continue }
                 distanceByTile[tile, default: 0] += stepDistance
                 movingTimeByTile[tile, default: 0] += stepTime
+                speedTimeByTile[tile, default: 0] += scoreSpeed * stepTime
             }
         }
 
@@ -74,7 +83,7 @@ public enum TileScoring {
         for (tile, distance) in distanceByTile {
             guard distance >= minTileDistanceMeters else { continue }
             guard let movingTime = movingTimeByTile[tile], movingTime > 0 else { continue }
-            scores[tile] = (distance / movingTime) * mphPerMetersPerSecond
+            scores[tile] = ((speedTimeByTile[tile] ?? 0) / movingTime) * mphPerMetersPerSecond
         }
         return scores
     }

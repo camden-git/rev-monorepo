@@ -13,7 +13,7 @@ struct TileScoringTests {
                 timestamp: start.addingTimeInterval(Double(i) * dt),
                 lat: base.latitude,
                 lng: base.longitude + Double(i) * lngStep,
-                speed: -1, // scoring derives speed from position so this field should be ignored
+                speed: -1, // invalid Doppler reading -> scorer falls back to position-derived speed
                 accuracy: 5
             )
         }
@@ -33,6 +33,27 @@ struct TileScoringTests {
 
         for score in scores.values {
             #expect(abs(score - expectedMph) < 0.5)
+        }
+    }
+
+
+    @Test func prefersDopplerOverJitteryPositions() {
+        let trueSpeed = 29.0 // m/s, ~65 mph
+        let t0 = Date(timeIntervalSince1970: 0)
+        let samples = (0..<12).map { i in
+            GPSSample(
+                timestamp: t0.addingTimeInterval(Double(i)),
+                lat: base.latitude + (i % 2 == 1 ? 0.0004 : 0), // ~44 m of lateral GPS wander
+                lng: -87.6300 + Double(i) * 0.00035, // ~29 m/s eastward
+                speed: trueSpeed,
+                accuracy: 5
+            )
+        }
+        let scores = TileScoring.perTileScores(for: samples)
+        #expect(!scores.isEmpty)
+        let wantMph = trueSpeed * TileScoring.mphPerMetersPerSecond // ~64.9
+        for score in scores.values {
+            #expect(abs(score - wantMph) < 4)
         }
     }
 

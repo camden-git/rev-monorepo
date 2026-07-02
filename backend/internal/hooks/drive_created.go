@@ -56,12 +56,13 @@ func stampDriveOwner(e *core.RecordRequestEvent) error {
 
 // RawSample is one drives.raw_path entry as stored on the wire. It mirrors the
 // RevKit GPSSample JSON shape ({timestamp, lat, lng, speed, accuracy}); the
-// server reads timestamp, lat, lng, and speed.
+// server reads timestamp, lat, lng, speed, and accuracy
 type RawSample struct {
-	TS    string  `json:"timestamp"`
-	Lat   float64 `json:"lat"`
-	Lng   float64 `json:"lng"`
-	Speed float64 `json:"speed"`
+	TS       string  `json:"timestamp"`
+	Lat      float64 `json:"lat"`
+	Lng      float64 `json:"lng"`
+	Speed    float64 `json:"speed"`
+	Accuracy float64 `json:"accuracy"`
 }
 
 // rawPathTimeLayout is the datetime format RevKit's PocketBaseCoding writes into
@@ -79,7 +80,7 @@ func SamplesFromRaw(raw []RawSample) []game.Sample {
 				continue
 			}
 		}
-		out = append(out, game.Sample{TS: ts, Lat: s.Lat, Lng: s.Lng, Speed: s.Speed})
+		out = append(out, game.Sample{TS: ts, Lat: s.Lat, Lng: s.Lng, Speed: s.Speed, Accuracy: s.Accuracy})
 	}
 	return out
 }
