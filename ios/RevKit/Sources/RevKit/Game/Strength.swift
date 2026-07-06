@@ -8,6 +8,9 @@ public enum Strength {
     public static let strengthCap = 5.0
     public static let valueGamma = 0.5
 
+    /// minimum claim strength a direct drive must reach to claim, capture, or refresh a tile
+    public static let claimFloor = 0.8
+
     public static func strength(speedMph: Double, refSpeed: Double) -> Double {
         guard speedMph.isFinite, speedMph > 0 else { return 0 }
         let ref = normalizedRef(refSpeed)

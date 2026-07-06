@@ -43,6 +43,11 @@ func TestReDrivingOwnTileTakesTheMax(t *testing.T) {
 	expectOutcome(t, Resolve(mine, "me", 30, claimNow), Reinforced, 40)
 }
 
+func TestReDrivingOwnExpiredTileReEarnsAtIncoming(t *testing.T) {
+	expired := tileState("me", 2.0, 12*7*24*time.Hour, false)
+	expectOutcome(t, Resolve(expired, "me", 1.2, claimNow), Reinforced, 1.2)
+}
+
 func TestBeatingDecayedOpponentCaptures(t *testing.T) {
 	// 80 mph driven 6 weeks ago (2τ, τ=3wk) decays to ~11 mph; 25 > 11
 	stale := tileState("rival", 80, 6*7*24*time.Hour, false)

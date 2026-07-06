@@ -36,6 +36,11 @@ struct ClaimResolverTests {
         #expect(ClaimResolver.resolve(current: mine, claimantId: "me", incomingScore: 30, now: now) == .reinforced(score: 40))
     }
 
+    @Test func reDrivingOwnExpiredTileReEarnsAtIncoming() {
+        let expired = state(owner: "me", score: 2.0, drivenAgo: 12 * 7 * 24 * 3600)
+        #expect(ClaimResolver.resolve(current: expired, claimantId: "me", incomingScore: 1.2, now: now) == .reinforced(score: 1.2))
+    }
+
     @Test func beatingDecayedOpponentCaptures() {
         // 80 mph driven 6 weeks ago (2τ, τ=3wk) decays to ~11 mph
         let stale = state(owner: "rival", score: 80, drivenAgo: 6 * 7 * 24 * 3600)

@@ -267,8 +267,12 @@ public final class DriveTracker {
                     contestedOwnerName = owner?.displayName ?? "Unclaimed"
                     contestedScore = store.effectiveScore(of: tile, now: sample.timestamp)
                 }
-                recordBeforeOwner(tile)
-                store.claim(tile)
+                // claim floor
+                let ref = store.tiles[tile]?.refSpeed ?? Strength.referenceSpeedPrior
+                if Strength.strength(speedMph: currentSpeedMph, refSpeed: ref) >= Strength.claimFloor {
+                    recordBeforeOwner(tile)
+                    store.claim(tile)
+                }
             }
         }
 
@@ -324,6 +328,8 @@ public final class DriveTracker {
             return (tile, Strength.strength(speedMph: rawScore, refSpeed: refSpeed))
         })
         let loopScore = strengths.isEmpty ? 0 : strengths.values.reduce(0, +) / Double(strengths.count)
+        // the loop itself must have been driven at pace
+        guard loopScore >= Strength.claimFloor else { return }
         // wall = trail ∪ territory owned BEFORE this drive
         // using the start snapshot (not live claimedCells) keeps freshly-captured interior out of the wall,
         // so re-triggers re-compute the same interior idempotently instead of recursively filling inward.

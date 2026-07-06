@@ -70,6 +70,18 @@ struct EnclosureTests {
         #expect(scored[center] == 0)
     }
 
+    /// an owned island buried inside the loop is not part of the perimeter: the gradient must not
+    /// seed from it, or scattered owned tiles flatten the depth field and the whole interior fills
+    @Test func ownedIslandInsideLoopDoesNotFlattenGradient() {
+        let loopScore = 2.0
+        let scored = Enclosure.enclose(trail: ring(center, 3), owned: [center], loopScore: loopScore).scoredInterior
+
+        // interior = rings 1..2 (the island itself is a wall). depth from the perimeter runs
+        // 1..2, so ring2 scores full and ring1 is past the 20% band
+        for cell in ring(center, 2) { #expect(abs((scored[cell] ?? -1) - loopScore) < 0.001) }
+        for cell in ring(center, 1) { #expect(scored[cell] == 0) }
+    }
+
     /// enormous fills are capped both by bounding-disk radius and by interior cell count
     @Test func enormousFillsAreCapped() {
         #expect(Enclosure.enclose(trail: ring(center, 2), loopScore: 30, maxRadius: 1).isEmpty)

@@ -10,4 +10,12 @@ public enum Decay {
         let delta = max(0, now.timeIntervalSince(lastDrivenAt))
         return claimScore * exp(-delta / tau)
     }
+
+    /// effective score below which ownership lapses
+    public static let expiryThreshold = 0.5
+
+    /// whether a tile's ownership has decayed away entirely
+    public static func expired(claimScore: Double, lastDrivenAt: Date, now: Date) -> Bool {
+        effectiveScore(claimScore: claimScore, lastDrivenAt: lastDrivenAt, now: now) < expiryThreshold
+    }
 }

@@ -46,6 +46,20 @@ func TestDecreasesMonotonicallyWithTime(t *testing.T) {
 	}
 }
 
+func TestExpiryFollowsTheEffectiveScoreThreshold(t *testing.T) {
+	if Expired(2.0, decayNow, decayNow) {
+		t.Fatal("fresh tile should not be expired")
+	}
+
+	if !Expired(2.0, decayNow.Add(-5*7*24*time.Hour), decayNow) {
+		t.Fatal("5-week-old 2.0 tile should be expired")
+	}
+
+	if !Expired(0.4, decayNow, decayNow) {
+		t.Fatal("sub-threshold tile should be expired")
+	}
+}
+
 func TestFutureLastDrivenIsClampedToFullScore(t *testing.T) {
 	future := decayNow.Add(time.Duration(Tau) * time.Second)
 	score := EffectiveScore(42, future, decayNow)

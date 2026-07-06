@@ -33,6 +33,14 @@ struct DecayTests {
         }
     }
 
+    @Test func expiryFollowsTheEffectiveScoreThreshold() {
+        #expect(!Decay.expired(claimScore: 2.0, lastDrivenAt: now, now: now))
+
+        #expect(Decay.expired(claimScore: 2.0, lastDrivenAt: now.addingTimeInterval(-5 * 7 * 24 * 3600), now: now))
+
+        #expect(Decay.expired(claimScore: 0.4, lastDrivenAt: now, now: now))
+    }
+
     @Test func futureLastDrivenIsClampedToFullScore() {
         let future = now.addingTimeInterval(Decay.tau)
         let score = Decay.effectiveScore(claimScore: 42, lastDrivenAt: future, now: now)

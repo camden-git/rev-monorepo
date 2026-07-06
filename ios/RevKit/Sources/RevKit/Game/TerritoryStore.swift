@@ -121,6 +121,24 @@ public final class TerritoryStore {
         let nextRef = Strength.updateReference(refSpeed: currentRef, speedMph: speedMph)
         let nextObs = (current?.obsCount ?? 0) + 1
 
+        // claim floor
+        guard strength >= Strength.claimFloor else {
+            if let current {
+                upsert(
+                    cellIndex,
+                    ownerId: current.ownerId,
+                    score: current.claimScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: current.captures,
+                    drivenSpeed: current.drivenSpeed,
+                    isHome: current.isHome,
+                    now: current.lastDrivenAt
+                )
+            }
+            return .noChange
+        }
+
         let outcome = ClaimResolver.resolve(
             current: current,
             claimantId: claimant,

@@ -60,11 +60,12 @@ public enum Enclosure {
         guard !region.isEmpty else { return Result() }
 
         // i think this works??
-        let interior = floodInterior(region: region, walls: walls)
+        let (interior, exterior) = floodInterior(region: region, walls: walls)
         guard interior.count >= minArea, interior.count <= maxInterior else { return Result() }
 
-        // diffusion gradient over BFS depth from the wall
-        return Result(scoredInterior: gradient(interior: interior, walls: walls, loopScore: loopScore))
+        // diffusion gradient over BFS depth from the enclosure's perimeter
+        let perimeter = perimeterWalls(walls: walls, exterior: exterior, region: region)
+        return Result(scoredInterior: gradient(interior: interior, walls: perimeter, loopScore: loopScore))
     }
 
     // MARK: geometry
@@ -109,11 +110,12 @@ public enum Enclosure {
         return ring
     }
 
-    /// BFS the open cells reachable from the disk's outer edge
-    /// returns empty if no exterior seed exists (e.g. owned land fills the whole disk edge)
-    private static func floodInterior(region: Set<UInt64>, walls: Set<UInt64>) -> Set<UInt64> {
+    /// BFS the open cells reachable from the disk's outer edge, returning the enclosed interior
+    /// (the cells it cannot reach) plus the reached exterior
+    /// empty interior if no exterior seed exists (e.g. owned land fills the whole disk edge)
+    private static func floodInterior(region: Set<UInt64>, walls: Set<UInt64>) -> (interior: Set<UInt64>, exterior: Set<UInt64>) {
         let open = region.subtracting(walls)
-        guard !open.isEmpty else { return [] }
+        guard !open.isEmpty else { return ([], []) }
 
         var exterior: Set<UInt64> = []
         var queue: [UInt64] = []
@@ -121,7 +123,7 @@ public enum Enclosure {
         for cell in open where neighbors(of: cell).contains(where: { !region.contains($0) }) {
             if exterior.insert(cell).inserted { queue.append(cell) }
         }
-        guard !queue.isEmpty else { return [] }
+        guard !queue.isEmpty else { return ([], exterior) }
 
         var head = 0
         while head < queue.count {
@@ -131,10 +133,17 @@ public enum Enclosure {
                 queue.append(n)
             }
         }
-        return open.subtracting(exterior)
+        return (open.subtracting(exterior), exterior)
     }
 
-    /// linear diffusion gradient
+    /// the wall cells that touch the exterioR
+    private static func perimeterWalls(walls: Set<UInt64>, exterior: Set<UInt64>, region: Set<UInt64>) -> Set<UInt64> {
+        walls.filter { cell in
+            neighbors(of: cell).contains { exterior.contains($0) || !region.contains($0) }
+        }
+    }
+
+    /// linear diffusion gradient over BFS depth from the perimeter
     private static func gradient(interior: Set<UInt64>, walls: Set<UInt64>, loopScore: Double) -> [UInt64: Double] {
         var depth: [UInt64: Int] = [:]
         var queue: [UInt64] = []

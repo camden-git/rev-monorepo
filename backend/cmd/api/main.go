@@ -44,6 +44,7 @@ func main() {
 	routes.RegisterAccountRoutes(app)
 	routes.RegisterSocialRoutes(app)
 	routes.RegisterDeviceRoutes(app)
+	hooks.RegisterExpiryCron(app)
 	stats.RegisterSnapshotCron(app)
 	roads.RegisterSeeder(app, roads.ConfigFromEnv())
 

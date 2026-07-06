@@ -254,6 +254,17 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 	nextRef := game.ClampReference(game.UpdateReference(effectiveRef, speedMph), band)
 	nextObs := obsCount + 1
 
+	// claim floor
+	if strength < game.ClaimFloor {
+		if existing != nil {
+			setTileReference(existing, nextRef, nextObs)
+			if err := txApp.Save(existing); err != nil {
+				return false, strength, "", game.NoChange, err
+			}
+		}
+		return false, strength, "", game.NoChange, nil
+	}
+
 	outcome := game.Resolve(current, userID, strength, now)
 	switch outcome.Kind {
 	case game.NoChange:
@@ -286,7 +297,11 @@ func resolveTile(txApp core.App, h3 uint64, userID string, speedMph float64, now
 		return true, strength, "", game.Reinforced, nil
 
 	case game.Captured:
+		// an expired tile was already effectively unowned
 		previousOwner := existing.GetString("owner")
+		if game.Expired(current.ClaimScore, current.LastDrivenAt, now) {
+			previousOwner = ""
+		}
 		captures := existing.GetInt("captures") + 1
 		setTileWindowParent(existing, h3)
 		setTileReference(existing, nextRef, nextObs)
@@ -349,7 +364,13 @@ func resolveEnclosure(
 		owned[h3] = true
 	}
 
-	opt := game.DefaultEncloseOptions(meanScore(perTileStrengths))
+	// the loop itself must have been driven at pace
+	loopScore := meanScore(perTileStrengths)
+	if loopScore < game.ClaimFloor {
+		return 0, nil
+	}
+
+	opt := game.DefaultEncloseOptions(loopScore)
 	opt.Owned = owned
 	result := game.Enclose(trail, opt)
 
@@ -415,6 +436,9 @@ func resolveStrengthTile(txApp core.App, h3 uint64, userID string, strength floa
 		return true, strength, "", game.Reinforced, nil
 	case game.Captured:
 		previousOwner := existing.GetString("owner")
+		if game.Expired(current.ClaimScore, current.LastDrivenAt, now) {
+			previousOwner = ""
+		}
 		captures := existing.GetInt("captures") + 1
 		setTileWindowParent(existing, h3)
 		existing.Set("owner", userID)

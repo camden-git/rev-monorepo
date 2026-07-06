@@ -157,6 +157,28 @@ func TestInteriorScoreFallsToZeroPastTheEdge(t *testing.T) {
 	}
 }
 
+// an owned island buried inside the loop is not part of the perimeter
+func TestOwnedIslandInsideLoopDoesNotFlattenGradient(t *testing.T) {
+	center := testCenter(t)
+	const loopScore = 2.0
+	opt := DefaultEncloseOptions(loopScore)
+	opt.Owned = ownedSet([]uint64{center})
+	scored := Enclose(ring(t, center, 3), opt).ScoredInterior
+
+	// interior = rings 1..2 (the island itself is a wall). depth from the
+	// perimeter runs 1..2, so ring2 scores full and ring1 is past the 20% band
+	for _, cell := range ring(t, center, 2) {
+		if math.Abs(scored[cell]-loopScore) >= 0.001 {
+			t.Fatalf("ring2 cell expected %v, got %v", loopScore, scored[cell])
+		}
+	}
+	for _, cell := range ring(t, center, 1) {
+		if scored[cell] != 0 {
+			t.Fatalf("island-adjacent cell expected 0 (must not seed from the island), got %v", scored[cell])
+		}
+	}
+}
+
 // enormous fills are capped both by bounding-disk radius and by interior cell count
 func TestEnormousFillsAreCapped(t *testing.T) {
 	center := testCenter(t)

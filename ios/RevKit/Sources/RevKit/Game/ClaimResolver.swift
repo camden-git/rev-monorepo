@@ -48,7 +48,8 @@ public enum ClaimResolver {
     ///
     /// - unowned tile -> `.created` (first traversal claims it at the driver's score)
     /// - home hex -> `.noChange` (inviolable by direct drive)
-    /// - your own tile -> `.reinforced(max(current, new))` (re-drive floor)
+    /// - your own tile -> `.reinforced(max(current, new))` (re-drive floor); if the tile
+    ///   expired the old score is gone and it re-earns at the incoming score
     /// - someone else's tile -> compare against its decayed score; `>=` flips it
     ///   (`.captured`), ties last-write-wins otherwise `.noChange`
     public static func resolve(
@@ -64,6 +65,9 @@ public enum ClaimResolver {
             return .noChange
         }
         if current.ownerId == claimantId {
+            if Decay.expired(claimScore: current.claimScore, lastDrivenAt: current.lastDrivenAt, now: now) {
+                return .reinforced(score: incomingScore)
+            }
             return .reinforced(score: max(current.claimScore, incomingScore))
         }
         let effective = Decay.effectiveScore(

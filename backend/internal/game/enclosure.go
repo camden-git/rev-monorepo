@@ -94,13 +94,14 @@ func Enclose(trail []uint64, opt EncloseOptions) Result {
 	}
 	region := sliceToSet(regionCells)
 
-	interior := floodInterior(region, walls)
+	interior, exterior := floodInterior(region, walls)
 	if len(interior) < opt.MinArea || len(interior) > opt.MaxInterior {
 		return Result{}
 	}
 
-	// diffusion gradient over BFS depth from the wall
-	return Result{ScoredInterior: gradient(interior, walls, opt.LoopScore)}
+	// diffusion gradient over BFS depth from the enclosure's perimeteR
+	perimeter := perimeterWalls(walls, exterior, region)
+	return Result{ScoredInterior: gradient(interior, perimeter, opt.LoopScore)}
 }
 
 // maxBridgeGridDistance caps how many grid steps contiguousRing will stitch
@@ -162,15 +163,15 @@ func aspectRatioOK(ring map[uint64]bool, maxAspect float64) bool {
 }
 
 // floodInterior BFSes the open cells reachable from the disk's outer edge and
-// returns the cells it cannot reach (the enclosed interior). empty if no
-// exterior seed exists
-func floodInterior(region, walls map[uint64]bool) map[uint64]bool {
+// returns the cells it cannot reach (the enclosed interior) plus the reached
+// exterior. empty interior if no exterior seed exists
+func floodInterior(region, walls map[uint64]bool) (interior, exterior map[uint64]bool) {
 	open := difference(region, walls)
 	if len(open) == 0 {
-		return map[uint64]bool{}
+		return map[uint64]bool{}, map[uint64]bool{}
 	}
 
-	exterior := map[uint64]bool{}
+	exterior = map[uint64]bool{}
 	var queue []uint64
 	for cell := range open {
 		if hasNeighborOutside(cell, region) {
@@ -181,7 +182,7 @@ func floodInterior(region, walls map[uint64]bool) map[uint64]bool {
 		}
 	}
 	if len(queue) == 0 {
-		return map[uint64]bool{}
+		return map[uint64]bool{}, exterior
 	}
 
 	for head := 0; head < len(queue); head++ {
@@ -193,12 +194,26 @@ func floodInterior(region, walls map[uint64]bool) map[uint64]bool {
 			}
 		}
 	}
-	return difference(open, exterior)
+	return difference(open, exterior), exterior
 }
 
-// gradient assigns a linear diffusion gradient over BFS depth from the wall:
-// loopScore at the wall falling to 0 once you penetrate 20% of the way to the
-// deepest cell
+// perimeterWalls returns the wall cells that touch the exterior
+func perimeterWalls(walls, exterior, region map[uint64]bool) map[uint64]bool {
+	out := map[uint64]bool{}
+	for cell := range walls {
+		for _, n := range neighbors(cell) {
+			if exterior[n] || !region[n] {
+				out[cell] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+// gradient assigns a linear diffusion gradient over BFS depth from the
+// enclosure's perimeter: loopScore at the perimeter falling to 0 once you
+// penetrate 20% of the way to the deepest cell; past that nothing is claimed
 func gradient(interior, walls map[uint64]bool, loopScore float64) map[uint64]float64 {
 	depth := map[uint64]int{}
 	var queue []uint64

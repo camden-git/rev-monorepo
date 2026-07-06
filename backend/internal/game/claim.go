@@ -35,12 +35,18 @@ type ClaimOutcome struct {
 	Score float64
 }
 
+// ClaimFloor is the minimum claim strength a direct drive must reach to claim,
+// capture, or refresh a tile
+// enclosure interior claims are exempt
+const ClaimFloor = 0.8
+
 // Resolve resolves a single tile claim (REF: docs/game-design.md §Direct Claims,
 // §Re-Drive Floor, §Home Hex), port of RevKit ClaimResolver.resolve:
 //
 //   - nil current      -> created at the driver's score (first traversal)
 //   - home hex         -> NoChange (inviolable by direct drive)
-//   - claimant's tile  -> reinforced at max(current, incoming) (re-drive floor)
+//   - claimant's tile  -> reinforced at max(current, incoming) (re-drive floor);
+//     if the tile expired the old score is gone and it re-earns at incoming
 //   - someone else's   -> compare incoming against the decayed score; `>=` flips
 //     it (Captured, ties last-write-wins), otherwise NoChange
 func Resolve(current *TileState, claimantID string, incomingScore float64, now time.Time) ClaimOutcome {
@@ -51,6 +57,9 @@ func Resolve(current *TileState, claimantID string, incomingScore float64, now t
 		return ClaimOutcome{Kind: NoChange}
 	}
 	if current.OwnerID == claimantID {
+		if Expired(current.ClaimScore, current.LastDrivenAt, now) {
+			return ClaimOutcome{Kind: Reinforced, Score: incomingScore}
+		}
 		return ClaimOutcome{Kind: Reinforced, Score: math.Max(current.ClaimScore, incomingScore)}
 	}
 	effective := EffectiveScore(current.ClaimScore, current.LastDrivenAt, now)
