@@ -186,8 +186,11 @@ public final class SyncService {
             recordSyncFailure(error, operation: "uploadPending")
             return
         }
-        if result.uploaded > 0, !currentVisibleTileCells.isEmpty {
-            await pollVisibleTiles(h3Cells: currentVisibleTileCells, force: true)
+        if result.uploaded > 0 {
+            // full reconcile, not a merge-only window poll: pruning is the only
+            // cleanup for optimistic tiles the server silently refused. tiles from a
+            // still-active drive reappear on the next live rescore tick
+            await reconcileTiles()
         }
     }
 
@@ -246,11 +249,16 @@ public final class SyncService {
     }
 
     /// push the raw GPS samples recorded so far in the active drive so the server
-    /// scores, resolves, and broadcasts the resulting captures live to other players
+    /// scores, resolves, and broadcasts the resulting captures live to other players.
+    /// tiles the server refuses (outside the Chicago geofence) are rolled back
+    /// locally so an optimistic claim can't outlive its rejection
     public func flushLiveClaims(_ rawPath: [GPSSample]) async {
         guard currentUserId != nil, !rawPath.isEmpty else { return }
         do {
-            try await client.claimTiles(rawPath: rawPath)
+            let response = try await client.claimTiles(rawPath: rawPath)
+            for cell in response.rejectedCells {
+                store.discardLocalClaim(cell)
+            }
         } catch {
             recordSyncFailure(error, operation: "flushLiveClaims", visible: false)
         }

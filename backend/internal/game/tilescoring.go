@@ -21,7 +21,7 @@ const (
 	// MaxSegmentGap is the max time (s) between fixes before a segment is treated
 	// as a tracking gap rather than real travel
 	MaxSegmentGap = 10.0
-	// maxSegmentSpeed is the fastest a segment can imply (m/s, ~200 mph) before
+	// maxSegmentSpeed is the fastest a segment can imply (m/s, ~300 mph) before
 	// it's treated as a GPS teleport rather than real travel
 	maxSegmentSpeed = 134
 	// subStepMeters is the target length each segment is broken into for tile
@@ -33,6 +33,9 @@ const (
 	// minTileDistanceMeters is the minimum in-tile travel before a tile earns a
 	// score; below this the tile is too noisy to trust
 	minTileDistanceMeters = 12.0
+	// dopplerAgreementSlack pads the Doppler-vs-position agreement envelope
+	// (m/s) for timestamp jitter and chord-shortening through curves
+	dopplerAgreementSlack = 3.0
 )
 
 // Cell returns the res-10 cell containing a coordinate
@@ -78,7 +81,18 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 		// unavailable (negative CoreLocation speed = invalid fix).
 		scoreSpeed := segmentSpeed
 		if a.Speed >= 0 && b.Speed >= 0 {
-			scoreSpeed = (a.Speed + b.Speed) / 2
+			dopplerSpeed := (a.Speed + b.Speed) / 2
+			// position error only ever adds apparent path length, so Doppler
+			// below the position-implied speed is the multipath case Doppler
+			// exists for. Doppler above what the positions plus their accuracy
+			// budget support is a chip glitch: drop the segment rather than
+			// trust either signal. bounds glitches without capping legitimate
+			// speed, which always comes with matching position deltas
+			tolerance := (math.Max(a.Accuracy, 0)+math.Max(b.Accuracy, 0))/dt + dopplerAgreementSlack
+			if dopplerSpeed > segmentSpeed+tolerance {
+				continue
+			}
+			scoreSpeed = dopplerSpeed
 		}
 
 		// walk the segment in small steps and attribute each step's distance/time

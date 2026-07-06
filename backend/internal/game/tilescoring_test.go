@@ -98,6 +98,41 @@ func TestPerTileScoresFallsBackToPositionWithoutDoppler(t *testing.T) {
 	}
 }
 
+// a Doppler reading the fix positions can't possibly support is a chip glitch:
+// the segment is dropped, not scored from either signal
+func TestPerTileScoresDropsDopplerGlitchSegments(t *testing.T) {
+	// positions crawl east at ~16.5 m/s while every fix claims ~670 m/s (~1500 mph)
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		samples = append(samples, atSpeed(float64(i), 41.8800, -87.6300+0.0002*float64(i), 670))
+	}
+	if scores := PerTileScores(samples); len(scores) != 0 {
+		t.Fatalf("glitched-Doppler segments should score nothing, got %v", scores)
+	}
+}
+
+// there is no cap on legitimate speed: when Doppler and the positions agree on a
+// very fast run, it scores at face value
+func TestPerTileScoresKeepsLegitimateHighSpeed(t *testing.T) {
+	// ~80 m/s (~179 mph) eastward, positions and Doppler in agreement
+	// (0.000965 deg lng/s at lat 41.88 is ~80 m/s)
+	const speed = 80.0
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		samples = append(samples, atSpeed(float64(i), 41.8800, -87.6300+0.000965*float64(i), speed))
+	}
+	scores := PerTileScores(samples)
+	if len(scores) == 0 {
+		t.Fatal("expected at least one scored tile")
+	}
+	wantMph := speed * MphPerMetersPerSecond // ~179
+	for tile, mph := range scores {
+		if mph < wantMph-6 || mph > wantMph+6 {
+			t.Fatalf("tile %d scored %.1f mph, want ~%.1f (legitimate speed must not be capped)", tile, mph, wantMph)
+		}
+	}
+}
+
 // a path whose every segment is below the stopped-speed threshold earns no
 // tile scores
 func TestPerTileScoresIgnoresStoppedPath(t *testing.T) {

@@ -45,6 +45,26 @@ struct RealtimeSyncTests {
         #expect(client.claimBatches.first?.count == SyncFixtures.liveBatch.count)
     }
 
+    /// tiles the server refuses (outside the geofence) must not survive locally as
+    /// phantom optimistic claims
+    @Test func flushLiveClaimsRollsBackRejectedTiles() async throws {
+        let client = MockPocketBaseClient()
+        let store = makeStore()
+        let sync = makeSync(store: store, client: client, realtime: MockTileRealtimeClient())
+        sync.adoptSession(AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+
+        let rejectedCell: UInt64 = 622_172_175_453_814_783 // an out-of-Chicago cell
+        let keptCell: UInt64 = 622_172_175_453_814_784
+        store.claim(rejectedCell)
+        store.claim(keptCell)
+        client.rejectedClaimCells = [String(rejectedCell)]
+
+        await sync.flushLiveClaims(SyncFixtures.liveBatch)
+
+        #expect(store.tiles[rejectedCell] == nil)
+        #expect(store.tiles[keptCell] != nil)
+    }
+
     @Test func flushLiveClaimsSkippedWhenSignedOutOrEmpty() async throws {
         let client = MockPocketBaseClient()
         let sync = makeSync(store: makeStore(), client: client, realtime: MockTileRealtimeClient())

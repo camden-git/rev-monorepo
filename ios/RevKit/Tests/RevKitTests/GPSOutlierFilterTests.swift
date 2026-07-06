@@ -43,22 +43,63 @@ struct GPSOutlierFilterTests {
         #expect(!filtered.contains { abs($0.lat - (base.latitude + 1.0)) < 0.0001 })
     }
 
-    @Test func smoothingDampensSpeedSpike() {
+    /// a momentary reported-speed spike with otherwise-normal positions is a glitched chip
+    /// reading: it's invalidated outright (scoring falls back to position speed there) instead of
+    /// being averaged into its neighbours
+    @Test func dopplerSpikeIsInvalidatedNotSmeared() {
         var samples = track(steps: 5, lngStep: 0.0003, speed: 10)
-        // a momentary reported-speed spike with otherwise-normal positions survives rejection but
-        // should be smoothed down by the moving average
         samples[2] = GPSSample(
             timestamp: samples[2].timestamp,
             lat: samples[2].lat,
             lng: samples[2].lng,
-            speed: 50,
+            speed: 50, // 10 -> 50 m/s in one second is ~4g, impossible on the road
             accuracy: 5
         )
 
         let filtered = GPSOutlierFilter.filterOutliers(samples)
-        let spiked = filtered[2].speed
-        #expect(spiked < 50)
-        #expect(spiked > 10)
+        #expect(filtered[2].speed < 0)
+        for (i, sample) in filtered.enumerated() where i != 2 {
+            #expect(abs(sample.speed - 10) < 0.001, "the spike must not bleed into neighbours")
+        }
+    }
+
+    /// one absurd Doppler reading among steady ones must not survive the filter with any
+    /// believable-looking speed attached
+    @Test func absurdDopplerGlitchIsInvalidated() {
+        var samples = track(steps: 7, lngStep: 0.00035, speed: 29)
+        samples[3] = GPSSample(
+            timestamp: samples[3].timestamp,
+            lat: samples[3].lat,
+            lng: samples[3].lng,
+            speed: 670, // ~1500 mph
+            accuracy: 5
+        )
+
+        let filtered = GPSOutlierFilter.filterOutliers(samples)
+        #expect(filtered.count == samples.count)
+        #expect(filtered[3].speed < 0)
+        for (i, sample) in filtered.enumerated() where i != 3 {
+            #expect(abs(sample.speed - 29) < 0.001)
+        }
+    }
+
+    /// invalid Doppler readings stay invalid through smoothing (so the scorer's position fallback
+    /// still triggers) and don't drag valid neighbours toward zero
+    @Test func smoothingPreservesInvalidDoppler() {
+        var samples = track(steps: 5, lngStep: 0.0003, speed: 29)
+        samples[2] = GPSSample(
+            timestamp: samples[2].timestamp,
+            lat: samples[2].lat,
+            lng: samples[2].lng,
+            speed: -1, // no Doppler fix
+            accuracy: 5
+        )
+
+        let filtered = GPSOutlierFilter.filterOutliers(samples)
+        #expect(filtered[2].speed < 0)
+        for (i, sample) in filtered.enumerated() where i != 2 {
+            #expect(abs(sample.speed - 29) < 0.001, "an invalid neighbour must not drag speeds down")
+        }
     }
 
     @Test func earlyGlitchIsRejected() {

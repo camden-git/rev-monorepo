@@ -75,10 +75,11 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         return try await send(request, decoding: DriveRecordDTO.self)
     }
 
-    public func claimTiles(rawPath: [GPSSample]) async throws {
+    @discardableResult
+    public func claimTiles(rawPath: [GPSSample]) async throws -> TileClaimResponse {
         var request = try makeRequest(path: "/api/rev/tiles/claim", method: "POST", authed: true)
         request.httpBody = try encoder.encode(TileClaimRequest(rawPath: rawPath))
-        _ = try await send(request, decoding: TileClaimResponse.self)
+        return try await send(request, decoding: TileClaimResponse.self)
     }
 
     public func listTiles(updatedSince: Date?) async throws -> [TileDTO] {

@@ -18,6 +18,10 @@ type Sample struct {
 const (
 	// maxAcceleration is the implied-acceleration rejection threshold in m/s/s
 	maxAcceleration = 9.80665
+	// maxDopplerAcceleration is the plausibility threshold (m/s/s, ~1.5g) for a
+	// jump in the device-reported Doppler speed between consecutive fixes. no
+	// street vehicle sustains this, while a chip glitch jumps by hundreds
+	maxDopplerAcceleration = 15.0
 	// smoothingWindow is the centered moving-average width over the speed field
 	smoothingWindow = 3
 	// spikeExcursionMeters is how far a fix must fling from the path before it's
@@ -39,13 +43,15 @@ const earthRadiusMeters = 6371000.0
 //  1. drop fixes the device flags as too inaccurate to trust
 //  2. reject GPS teleport spikes by geometry
 //  3. reject any sample implying >1g sustained acceleration vs. the prior retained sample
-//  4. smooth the remaining samples' reported speeds
+//  4. invalidate spike-shaped Doppler readings (the position filters above never
+//     look at the reported speed, and it's the value scoring actually stores)
+//  5. smooth the remaining samples' reported speeds
 func FilterOutliers(samples []Sample) []Sample {
 	samples = rejectLowAccuracy(samples)
 	if len(samples) <= 2 {
 		return samples
 	}
-	return smoothSpeeds(rejectAccelerationOutliers(rejectPositionSpikes(samples)))
+	return smoothSpeeds(invalidateDopplerSpikes(rejectAccelerationOutliers(rejectPositionSpikes(samples))))
 }
 
 // rejectLowAccuracy drops fixes CoreLocation marks untrustworthy: a negative
@@ -146,7 +152,40 @@ func rejectAccelerationOutliers(samples []Sample) []Sample {
 	return retained
 }
 
-// smoothSpeeds applies a window-3 centered moving average over the speed field
+// invalidateDopplerSpikes marks spike-shaped Doppler readings invalid (speed -1)
+// so scoring falls back to position-derived speed there. a spike is implausible
+// acceleration away from both neighbours while they agree with each other: a
+// glitched chip reading, not hard driving, which moves all three together
+func invalidateDopplerSpikes(samples []Sample) []Sample {
+	if len(samples) <= 2 {
+		return samples
+	}
+	out := make([]Sample, len(samples))
+	copy(out, samples)
+	for i := 1; i+1 < len(samples); i++ {
+		prev, cur, next := samples[i-1], samples[i], samples[i+1]
+		if prev.Speed < 0 || cur.Speed < 0 || next.Speed < 0 {
+			continue
+		}
+		dtIn := cur.TS.Sub(prev.TS).Seconds()
+		dtOut := next.TS.Sub(cur.TS).Seconds()
+		dtAcross := next.TS.Sub(prev.TS).Seconds()
+		if dtIn <= 0 || dtOut <= 0 || dtAcross <= 0 {
+			continue
+		}
+		accelIn := math.Abs(cur.Speed-prev.Speed) / dtIn
+		accelOut := math.Abs(next.Speed-cur.Speed) / dtOut
+		accelAcross := math.Abs(next.Speed-prev.Speed) / dtAcross
+		if accelIn > maxDopplerAcceleration && accelOut > maxDopplerAcceleration && accelAcross <= maxDopplerAcceleration {
+			out[i].Speed = -1
+		}
+	}
+	return out
+}
+
+// smoothSpeeds applies a window-3 centered moving average over the speed field.
+// invalid readings (negative = no Doppler fix) are excluded and stay invalid:
+// fabricating a speed would drag real speeds down and defeat the position fallback
 func smoothSpeeds(samples []Sample) []Sample {
 	if len(samples) < smoothingWindow {
 		return samples
@@ -154,6 +193,10 @@ func smoothSpeeds(samples []Sample) []Sample {
 	half := smoothingWindow / 2
 	out := make([]Sample, len(samples))
 	for i := range samples {
+		out[i] = samples[i]
+		if samples[i].Speed < 0 {
+			continue
+		}
 		lower := i - half
 		if lower < 0 {
 			lower = 0
@@ -165,10 +208,12 @@ func smoothSpeeds(samples []Sample) []Sample {
 		var sum float64
 		count := 0
 		for j := lower; j <= upper; j++ {
-			sum += math.Max(samples[j].Speed, 0)
+			if samples[j].Speed < 0 {
+				continue
+			}
+			sum += samples[j].Speed
 			count++
 		}
-		out[i] = samples[i]
 		out[i].Speed = sum / float64(count)
 	}
 	return out

@@ -184,12 +184,9 @@ struct TileDetailView: View {
             return (drove: speed, multiple: speed / ref)
         }
         guard let score = claimMultiple, score > 0 else { return nil }
-        // legacy rows stored the score as raw mph (always above the strength cap)
-        if score > Strength.strengthCap {
-            return (drove: score, multiple: score / ref)
-        }
-        // a capped strength with no recorded speed can't be turned back into a real
-        // mph
+        // claim_score is always a strength (≤ cap); anything above is corrupt data,
+        // not a reconstructable pace. a capped strength with no recorded speed can't
+        // be turned back into a real mph
         if score >= Strength.strengthCap {
             return nil
         }

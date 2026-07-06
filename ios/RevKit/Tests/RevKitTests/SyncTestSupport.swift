@@ -37,6 +37,8 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         DriveRecordDTO(id: "rec", created: nil)
     }
     var onClaimTiles: @Sendable ([GPSSample]) throws -> Void = { _ in }
+    /// h3 ids returned as `rejected` from every claimTiles call
+    var rejectedClaimCells: [String] = []
     var onListTiles: @Sendable (Date?) throws -> [TileDTO] = { _ in [] }
     var onListTilesForCells: @Sendable (Set<UInt64>) throws -> [TileDTO] = { _ in [] }
     var onAuth: @Sendable (String, String?) throws -> AuthResponse = { _, _ in
@@ -91,9 +93,11 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
         return try onCreateDrive(payload)
     }
 
-    func claimTiles(rawPath: [GPSSample]) async throws {
+    @discardableResult
+    func claimTiles(rawPath: [GPSSample]) async throws -> TileClaimResponse {
         lock.withLock { claimBatches.append(rawPath) }
         try onClaimTiles(rawPath)
+        return TileClaimResponse(ok: true, rejected: lock.withLock { rejectedClaimCells })
     }
 
     func listTiles(updatedSince: Date?) async throws -> [TileDTO] {

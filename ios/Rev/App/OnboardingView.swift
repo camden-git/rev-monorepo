@@ -4,13 +4,13 @@ import RevKit
 import SwiftUI
 import UIKit
 
-/// first-launch home selection (REF: docs/game-design.md §Home Hex)
+/// first-launch flow, two steps (REF: docs/game-design.md §Home Hex):
 ///
-/// the player picks a home either by geocoding an address or by panning a pin on the map. the
-/// selected coordinate is converted to a res-10 H3 cell and persisted as their home
-///
-/// FUTURE (server-side): home assignment moves to signup in `backend/internal/game/`
-/// behind Sign-in-with-Apple; this screen would post the chosen `home_h3` with the user record.
+///   1. welcome: the game is invite-only, so the invite form is the front door.
+///      Sign in with Apple sits behind "Returning player?" for reinstalls
+///   2. set home: full-screen map with the center pin and a floating panel,
+///      shown once signed in. the chosen coordinate becomes the player's
+///      permanent res-10 home hex
 struct OnboardingView: View {
     let store: TerritoryStore
     let signIn: AppleSignInCoordinator
@@ -28,6 +28,7 @@ struct OnboardingView: View {
     @State private var addressText = ""
     @State private var isGeocoding = false
     @State private var errorMessage: String?
+    @State private var showReturningOptions = false
 
     private let geocoder = CLGeocoder()
 
@@ -39,25 +40,86 @@ struct OnboardingView: View {
                 }
                 .ignoresSafeArea()
 
-            // fixed center pin
+            if sync.isSignedIn {
+                homeStep
+            } else {
+                welcomeStep
+            }
+        }
+        .animation(.snappy, value: sync.isSignedIn)
+    }
+
+    // MARK: step 1 - welcome / invite
+
+    private var welcomeStep: some View {
+        ZStack {
+            // light scrim keeps the card legible while the map stays visible
+            Color.black.opacity(0.12)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 28) {
+                    // explicit label color, glass vibrancy washes out semantic styles
+                    RevWordmark()
+                        .fill(Color(.label))
+                        .frame(width: 118, height: 118 * RevWordmark.viewBox.height / RevWordmark.viewBox.width)
+
+                    VStack(spacing: 10) {
+                        Text("Rev is invite-only for now")
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        InviteSignInView(sync: sync)
+                    }
+
+                    returningSection
+                }
+                .padding(28)
+                .glassCard()
+                .frame(maxWidth: 480)
+                .padding(20)
+            }
+            .defaultScrollAnchor(.center)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var returningSection: some View {
+        VStack(spacing: 10) {
+            Button(showReturningOptions ? "Hide returning options" : "Returning player?") {
+                withAnimation(.snappy) { showReturningOptions.toggle() }
+            }
+            .font(.footnote.weight(.medium))
+            .buttonStyle(.borderless)
+
+            if showReturningOptions {
+                AppleSignInButton(coordinator: signIn) { response in
+                    sync.adoptSession(response)
+                    Task { await sync.refreshAfterSignIn() }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    // MARK: step 2 - pick the home hex
+
+    private var homeStep: some View {
+        ZStack {
+            // fixed center pin, tip on the center point
             Image(systemName: "mappin")
                 .font(.title)
                 .foregroundStyle(.red)
                 .shadow(radius: 2)
-                .offset(y: -11) // tip sits on the center point
+                .offset(y: -11)
 
             VStack {
                 addressBar
                 Spacer()
+                homePanel
             }
-            .padding()
-        }
-        .sheet(isPresented: .constant(true)) {
-            confirmPanel
-                .presentationDetents([.height(390)])
-                .presentationBackgroundInteraction(.enabled(upThrough: .height(390)))
-                .presentationDragIndicator(.hidden)
-                .interactiveDismissDisabled()
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
         }
     }
 
@@ -81,14 +143,16 @@ struct OnboardingView: View {
         .glassCapsule()
     }
 
-    private var confirmPanel: some View {
+    private var homePanel: some View {
         VStack(spacing: 12) {
-            Text("Set your home")
-                .font(.title3.weight(.semibold))
-            Text("Move the map to place the pin on your home, then confirm. Your home hex is permanent, it can never be taken.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 4) {
+                Text("Set your home")
+                    .font(.title3.weight(.semibold))
+                Text("Pan the map until the pin sits on your home. Your home hex is permanent, it can never be taken.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
 
             if let errorMessage {
                 Text(errorMessage)
@@ -97,24 +161,18 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
+            // solid prominent style: a glass button inside a glass card washes out
             Button(action: setHome) {
                 Label("Set Home Here", systemImage: "house.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
             }
-            .glassProminentButton()
-
-            InviteSignInView(sync: sync)
-
-            // scaffolding lowk
-            AppleSignInButton(coordinator: signIn) { response in
-                sync.adoptSession(response)
-                Task { await sync.refreshAfterSignIn() }
-            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(20)
+        .glassCard()
     }
 
     // MARK: actions
@@ -151,13 +209,16 @@ struct OnboardingView: View {
             errorMessage = "Couldn't resolve that spot. Move the pin slightly and try again."
             return
         }
+        guard HomeSelection.isWithinPlayArea(cell) else {
+            errorMessage = "Rev is Chicago-only for now - pick a home inside the city limits."
+            return
+        }
         guard HomeSelection.isEligible(cell, existingHomes: store.otherPlayerHomeCells) else {
             errorMessage = "That hex is already someone's home. Please pick a different spot."
             return
         }
         store.establishHome(at: cell)
-        // if the player onboarded while already signed in, push the chosen home
-        // hex to their server record so the roster reflects it
+        // push the chosen home hex to the server record so the roster reflects it
         if sync.isSignedIn {
             Task { await sync.pushProfile() }
         }
@@ -191,37 +252,42 @@ struct InviteSignInView: View {
                     text: $displayName,
                     textContentType: .name,
                     autocapitalizationType: .words,
-                    autocorrectionType: .no,
-                    borderStyle: .roundedRect
+                    autocorrectionType: .no
                 )
+                .inviteField()
                 ResponsiveTextField(
                     "Email",
                     text: $email,
                     textContentType: .emailAddress,
                     keyboardType: .emailAddress,
                     autocapitalizationType: .none,
-                    autocorrectionType: .no,
-                    borderStyle: .roundedRect
+                    autocorrectionType: .no
                 )
+                .inviteField()
                 ResponsiveTextField(
                     "Invite code",
                     text: $code,
                     autocapitalizationType: .allCharacters,
-                    autocorrectionType: .no,
-                    borderStyle: .roundedRect
+                    autocorrectionType: .no
                 )
+                .inviteField()
                 Button {
                     Task { await submit() }
                 } label: {
                     if isSubmitting {
                         ProgressView()
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
                     } else {
                         Label("Enter with Invite", systemImage: "key.fill")
+                            .font(.headline)
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
                     }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .padding(.top, 4)
                 .disabled(!canSubmit || isSubmitting)
 
                 if let error = sync.lastError {
@@ -232,7 +298,6 @@ struct InviteSignInView: View {
                 }
             }
         }
-        .textFieldStyle(.roundedBorder)
     }
 
     private func submit() async {
@@ -250,14 +315,10 @@ struct InviteSignInView: View {
 }
 
 private extension View {
-    // glassCapsule() now lives in ViewStyles.swift (shared)
-
-    @ViewBuilder
-    func glassProminentButton() -> some View {
-        if #available(iOS 26, *) {
-            buttonStyle(.glassProminent).tint(.blue)
-        } else {
-            buttonStyle(.borderedProminent).tint(.blue)
-        }
+    /// filled field chrome so inputs sit quietly on glass
+    func inviteField() -> some View {
+        padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

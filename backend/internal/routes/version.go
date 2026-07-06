@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -17,7 +18,39 @@ type versionResponse struct {
 	MinimumVersion string `json:"minimum_version"`
 	// the newest version available
 	LatestVersion string `json:"latest_version"`
+	// the git revision this binary was built from ("unknown" without a VCS
+	// stamp) so the deployed build is verifiable with one request
+	Commit string `json:"commit"`
 }
+
+// buildCommit resolves the binary's git revision once at startup: Go stamps
+// vcs.revision into the build info automatically when building from a git
+// checkout. "-dirty" is appended for builds with uncommitted changes
+var buildCommit = func() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	revision, dirty := "", false
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			revision = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if revision == "" {
+		return "unknown"
+	}
+	if len(revision) > 12 {
+		revision = revision[:12]
+	}
+	if dirty {
+		revision += "-dirty"
+	}
+	return revision
+}()
 
 // RegisterVersionRoutes exposes the app-version gate
 func RegisterVersionRoutes(app core.App) {
@@ -39,5 +72,6 @@ func appVersionGate(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, versionResponse{
 		MinimumVersion: minimum,
 		LatestVersion:  latest,
+		Commit:         buildCommit,
 	})
 }

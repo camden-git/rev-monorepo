@@ -237,17 +237,22 @@ public final class DriveTracker {
     fileprivate func ingest(_ locations: [CLLocation]) {
         guard currentDrive != nil else { return }
         for location in locations {
+            // negative speedAccuracy means the Doppler speed is invalid, but the
+            // speed value itself can still be non-negative garbage, so gate on it
+            let dopplerSpeed = location.speedAccuracy >= 0 ? location.speed : -1
             let sample = GPSSample(
                 timestamp: location.timestamp,
                 lat: location.coordinate.latitude,
                 lng: location.coordinate.longitude,
-                speed: location.speed,
+                speed: dopplerSpeed,
                 accuracy: location.horizontalAccuracy
             )
             currentDrive?.rawPath.append(sample)
-            currentSpeedMph = max(location.speed, 0) * TileScoring.mphPerMetersPerSecond
+            currentSpeedMph = max(dopplerSpeed, 0) * TileScoring.mphPerMetersPerSecond
 
-            if let tile = TileScoring.cell(lat: sample.lat, lng: sample.lng) {
+            // out-of-Chicago tiles are skipped entirely (no claim, no HUD, no enclosure
+            // trail), mirroring the server which silently refuses to create them
+            if let tile = TileScoring.cell(lat: sample.lat, lng: sample.lng), Geofence.containsCell(tile) {
                 if tile != lastTile {
                     let ownedAtStart = ownedAtDriveStart.contains(tile)
                     // closing the loop = touching a cell we've already crossed this drive, or
@@ -299,7 +304,7 @@ public final class DriveTracker {
         guard let drive = currentDrive else { return [:] }
         let cleanedPath = cleaned ?? GPSOutlierFilter.filterOutliers(drive.rawPath)
         let scores = TileScoring.perTileScores(for: cleanedPath)
-        for (tile, score) in scores {
+        for (tile, score) in scores where Geofence.containsCell(tile) {
             recordBeforeOwner(tile)
             store.claimSpeed(tile, speedMph: score)
         }
@@ -326,8 +331,9 @@ public final class DriveTracker {
         let home = store.localPlayer.homeCell
         let walls = ownedAtDriveStart.subtracting([home])
         let enclosed = Enclosure.enclose(trail: crossed, owned: walls, loopScore: loopScore)
-        // dont claim zero scores or home hex
-        for (tile, score) in enclosed.scoredInterior where score > 0 && tile != home {
+        // dont claim zero scores, the home hex, or interior outside Chicago (the server's
+        // enclosure resolution geofences each interior cell the same way)
+        for (tile, score) in enclosed.scoredInterior where score > 0 && tile != home && Geofence.containsCell(tile) {
             recordBeforeOwner(tile)
             enclosedCells.insert(tile)
             store.claim(tile, score: score, now: now)

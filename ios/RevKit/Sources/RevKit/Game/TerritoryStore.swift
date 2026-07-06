@@ -213,6 +213,20 @@ public final class TerritoryStore {
         }
     }
 
+    /// drop an optimistic local claim the server refused to create (e.g. outside
+    /// the Chicago geofence). only removes tiles the local player owns locally:
+    /// if the cell exists server-side under any owner, its authoritative state
+    /// arrives through the normal polls/broadcasts instead
+    public func discardLocalClaim(_ cell: UInt64) {
+        guard let state = tiles[cell], state.ownerId == localPlayer.id, !state.isHome else { return }
+        if let record = tileRecords[cell] {
+            context.delete(record)
+        }
+        tileRecords[cell] = nil
+        tiles[cell] = nil
+        scheduleSave()
+    }
+
     /// reconcile the local cache against the server's complete tile set
     public func reconcileTiles(authoritative remote: [TileDTO]) {
         let live = Set(remote.map(\.h3))

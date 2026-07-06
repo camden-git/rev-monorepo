@@ -1,8 +1,19 @@
+import CoreLocation
 import Foundation
 import Testing
 @testable import RevKit
 
 struct HomeSelectionTests {
+    @Test func homeInsideChicagoIsWithinPlayArea() throws {
+        let loop = try #require(H3Grid.cellId(for: CLLocationCoordinate2D(latitude: 41.8807, longitude: -87.6294)))
+        #expect(HomeSelection.isWithinPlayArea(loop))
+    }
+
+    @Test func homeOutsideChicagoIsRejected() throws {
+        let naperville = try #require(H3Grid.cellId(for: CLLocationCoordinate2D(latitude: 41.7508, longitude: -88.1535)))
+        #expect(!HomeSelection.isWithinPlayArea(naperville))
+    }
+
     @Test func anyCellIsEligibleWhenNoHomesExist() {
         #expect(HomeSelection.isEligible(0x8a1fb46622dffff, existingHomes: []))
     }

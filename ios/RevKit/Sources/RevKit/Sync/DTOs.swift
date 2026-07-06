@@ -120,9 +120,32 @@ public struct TileClaimRequest: Encodable, Sendable {
     }
 }
 
-/// `{ "ok": true }` ack from the claim endpoint
+/// ack from the claim endpoint. `rejected` lists the h3 ids (decimal strings)
+/// the server refused to process - tiles outside the Chicago geofence - so the
+/// client can drop its optimistic local claims instead of keeping phantoms
 public struct TileClaimResponse: Decodable, Sendable {
     public let ok: Bool
+    public let rejected: [String]
+
+    public init(ok: Bool, rejected: [String] = []) {
+        self.ok = ok
+        self.rejected = rejected
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try c.decodeIfPresent(Bool.self, forKey: .ok) ?? false
+        rejected = try c.decodeIfPresent([String].self, forKey: .rejected) ?? []
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case ok, rejected
+    }
+
+    /// the rejected ids as h3 cells (unparseable entries are dropped)
+    public var rejectedCells: [UInt64] {
+        rejected.compactMap(UInt64.init)
+    }
 }
 
 /// POST body for the compact map-window tile endpoint

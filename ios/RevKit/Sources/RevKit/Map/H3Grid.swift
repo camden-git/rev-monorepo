@@ -24,6 +24,11 @@ public enum H3Grid {
         cell(for: coordinate)?.id
     }
 
+    /// the cell's center coordinate, nil if it can't be resolved
+    public static func cellCenter(of cellId: UInt64) -> CLLocationCoordinate2D? {
+        try? H3Cell(cellId).center.coordinates
+    }
+
     /// res-10 cells covering (roughly) the visible region: the center cell expanded by a grid
     /// disk whose radius is derived from the region's diagonal reach
     /// returns [] when zoomed out past the cell cap

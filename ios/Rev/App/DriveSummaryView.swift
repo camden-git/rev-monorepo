@@ -415,8 +415,8 @@ private final class ShareCardItemSource: NSObject, UIActivityItemSource {
     }
 }
 
-//rev wordmark
-private struct RevWordmark: Shape {
+// rev wordmark ("Rev."), shared with OnboardingView's welcome card
+struct RevWordmark: Shape {
     static let viewBox = CGSize(width: 48.62, height: 17.71)
 
     static let commands: [String] = [
@@ -691,14 +691,7 @@ private struct DriveShareCard: View {
 }
 
 private extension View {
-    @ViewBuilder
-    func glassProminentButton() -> some View {
-        if #available(iOS 26, *) {
-            buttonStyle(.glassProminent).tint(.blue)
-        } else {
-            buttonStyle(.borderedProminent).tint(.blue)
-        }
-    }
+    // glassProminentButton() now lives in ViewStyles.swift (shared)
 
     @ViewBuilder
     func glassButton() -> some View {

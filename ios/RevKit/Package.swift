@@ -14,7 +14,8 @@ let package = Package(
     targets: [
         .target(
             name: "RevKit",
-            dependencies: ["SwiftyH3"]
+            dependencies: ["SwiftyH3"],
+            resources: [.copy("Game/chicago.geojson")]
         ),
         .testTarget(
             name: "RevKitTests",

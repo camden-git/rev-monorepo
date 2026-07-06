@@ -40,6 +40,10 @@ public enum TileScoring {
     /// the tile simply isn't scored (it may still be weakly claimed live at score 0).
     static let minTileDistanceMeters = 12.0
 
+    /// pads the Doppler-vs-position agreement envelope (m/s) for timestamp jitter and
+    /// chord-shortening through curves
+    static let dopplerAgreementSlack = 3.0
+
     public static func perTileScores(for samples: [GPSSample]) -> [UInt64: Double] {
         guard samples.count > 1 else { return [:] }
 
@@ -60,7 +64,18 @@ public enum TileScoring {
             // a GPS teleport: don't interpolate a line between two far-apart fixes
             guard segmentSpeed <= maxSegmentSpeedMetersPerSecond else { continue }
 
-            let scoreSpeed = (a.speed >= 0 && b.speed >= 0) ? (a.speed + b.speed) / 2 : segmentSpeed
+            // position error only ever adds apparent path length, so Doppler below the
+            // position-implied speed is the multipath case Doppler exists for. Doppler above
+            // what the positions plus their accuracy budget support is a chip glitch: drop the
+            // segment rather than trust either signal. bounds glitches without capping
+            // legitimate speed, which always comes with matching position deltas
+            var scoreSpeed = segmentSpeed
+            if a.speed >= 0, b.speed >= 0 {
+                let dopplerSpeed = (a.speed + b.speed) / 2
+                let tolerance = (max(a.accuracy, 0) + max(b.accuracy, 0)) / dt + dopplerAgreementSlack
+                guard dopplerSpeed <= segmentSpeed + tolerance else { continue }
+                scoreSpeed = dopplerSpeed
+            }
 
             // walk the segment in small steps and attribute each step's distance/time to the tile
             // it falls in. this keeps a barely-clipped tile from inheriting a whole segment's worth

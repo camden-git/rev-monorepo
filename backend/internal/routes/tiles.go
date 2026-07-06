@@ -33,6 +33,14 @@ type tileClaimRequest struct {
 	RawPath []hooks.RawSample `json:"raw_path"`
 }
 
+// tileClaimResponse acks a claim batch. Rejected lists the h3 ids the server
+// refused to process (outside the Chicago geofence) so the client can drop its
+// optimistic local claims for them
+type tileClaimResponse struct {
+	OK       bool     `json:"ok"`
+	Rejected []string `json:"rejected,omitempty"`
+}
+
 // RegisterTileRoutes adds purpose-built map tile endpoints
 func RegisterTileRoutes(app core.App, notifier notify.Notifier) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
@@ -56,12 +64,12 @@ func tileClaimHandler(notifier notify.Notifier) func(*core.RequestEvent) error {
 			return e.BadRequestError("invalid tile claim request.", err)
 		}
 		if len(form.RawPath) == 0 {
-			return e.JSON(http.StatusOK, map[string]bool{"ok": true})
+			return e.JSON(http.StatusOK, tileClaimResponse{OK: true})
 		}
 		if len(form.RawPath) > maxClaimSamples {
 			return e.BadRequestError("tile claim batch is too large", nil)
 		}
-		captures, err := hooks.ResolveDirectClaims(e.App, e.Auth.Id, hooks.SamplesFromRaw(form.RawPath), time.Now())
+		captures, rejected, err := hooks.ResolveDirectClaims(e.App, e.Auth.Id, hooks.SamplesFromRaw(form.RawPath), time.Now())
 		if err != nil {
 			return e.InternalServerError("failed to resolve tile claims", err)
 		}
@@ -70,7 +78,7 @@ func tileClaimHandler(notifier notify.Notifier) func(*core.RequestEvent) error {
 				notifier.TileCaptured(victimID, e.Auth.Id, count)
 			}
 		}
-		return e.JSON(http.StatusOK, map[string]bool{"ok": true})
+		return e.JSON(http.StatusOK, tileClaimResponse{OK: true, Rejected: rejected})
 	}
 }
 

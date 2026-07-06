@@ -57,6 +57,45 @@ struct TileScoringTests {
         }
     }
 
+    /// a Doppler reading the fix positions can't possibly support is a chip glitch: the segment is
+    /// dropped, not scored from either signal
+    @Test func dropsDopplerGlitchSegments() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        // positions crawl east at ~16.5 m/s while every fix claims ~670 m/s (~1500 mph)
+        let samples = (0..<12).map { i in
+            GPSSample(
+                timestamp: t0.addingTimeInterval(Double(i)),
+                lat: base.latitude,
+                lng: -87.6300 + Double(i) * 0.0002,
+                speed: 670,
+                accuracy: 5
+            )
+        }
+        #expect(TileScoring.perTileScores(for: samples).isEmpty)
+    }
+
+    /// there is no cap on legitimate speed: when Doppler and the positions agree on a very fast
+    /// run, it scores at face value
+    @Test func keepsLegitimateHighSpeed() {
+        let speed = 80.0 // m/s, ~179 mph; 0.000965 deg lng/s at lat 41.88 matches
+        let t0 = Date(timeIntervalSince1970: 0)
+        let samples = (0..<12).map { i in
+            GPSSample(
+                timestamp: t0.addingTimeInterval(Double(i)),
+                lat: base.latitude,
+                lng: -87.6300 + Double(i) * 0.000965,
+                speed: speed,
+                accuracy: 5
+            )
+        }
+        let scores = TileScoring.perTileScores(for: samples)
+        #expect(!scores.isEmpty)
+        let wantMph = speed * TileScoring.mphPerMetersPerSecond // ~179
+        for score in scores.values {
+            #expect(abs(score - wantMph) < 6)
+        }
+    }
+
     @Test func crossesMultipleTiles() {
         let samples = track(steps: 12, lngStep: 0.0004, dt: 1.0)
         let crossed = TileScoring.tilesCrossed(for: samples)

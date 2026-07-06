@@ -27,8 +27,10 @@ public protocol PocketBaseClient: Sendable {
 
     /// stream the raw GPS samples recorded so far mid-drive so the server scores
     /// and resolves them and broadcasts captures live to other players instead of
-    /// only at drive end. `POST /api/rev/tiles/claim`
-    func claimTiles(rawPath: [GPSSample]) async throws
+    /// only at drive end. returns which tiles the server refused so the caller
+    /// can roll back optimistic claims. `POST /api/rev/tiles/claim`
+    @discardableResult
+    func claimTiles(rawPath: [GPSSample]) async throws -> TileClaimResponse
 
     /// fetch tiles changed since `updatedSince` (nil = full snapshot)
     /// `GET /api/collections/tiles/records?filter=(updated>="…")`

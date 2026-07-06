@@ -179,17 +179,26 @@ func notifyCaptures(notifier notify.Notifier, attackerID string, captures map[st
 // server-side, so a live capture is just as authoritative as the final upload
 //
 // returns the owners this batch displaced (victim id -> tile count) so the live
-// claim route can push capture notifications as they happen. captures are
-// collected inside the transaction but only returned after it commits, so a
-// rolled-back batch raises nothing.
-func ResolveDirectClaims(app core.App, userID string, samples []game.Sample, now time.Time) (map[string]int, error) {
+// claim route can push capture notifications as they happen, plus the h3 ids of
+// tiles the server refused to process (outside the Chicago geofence) so the
+// client can roll back its optimistic local claims instead of keeping phantoms.
+// captures are collected inside the transaction but only returned after it
+// commits, so a rolled-back batch raises nothing.
+func ResolveDirectClaims(app core.App, userID string, samples []game.Sample, now time.Time) (map[string]int, []string, error) {
 	if userID == "" {
-		return nil, errors.New("claim batch has no user")
+		return nil, nil, errors.New("claim batch has no user")
 	}
 	perTile := game.PerTileScores(game.FilterOutliers(samples))
 	captures := map[string]int{}
+	rejected := []string{}
 	err := app.RunInTransaction(func(txApp core.App) error {
 		for h3, score := range perTile {
+			// checked here (not only inside resolveTile) so the refusal is
+			// reportable; resolveTile keeps its own guard for other callers
+			if !geofence.ContainsCell(h3) {
+				rejected = append(rejected, strconv.FormatUint(h3, 10))
+				continue
+			}
 			_, _, capturedFrom, _, err := resolveTile(txApp, h3, userID, score, now)
 			if err != nil {
 				return err
@@ -201,9 +210,9 @@ func ResolveDirectClaims(app core.App, userID string, samples []game.Sample, now
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return captures, nil
+	return captures, rejected, nil
 }
 
 // resolveTile applies one direct raw-mph observation and reports whether the
