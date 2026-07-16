@@ -114,6 +114,24 @@ public final class SocialService {
         }
     }
 
+    public func driveDetail(_ driveId: String) async -> DriveDetailDTO? {
+        do {
+            return try await client.fetchDrive(driveId: driveId)
+        } catch {
+            lastError = Self.message(for: error)
+            return nil
+        }
+    }
+
+    public func prHistory(_ userId: String, kind: String) async -> [PRPointDTO] {
+        do {
+            return try await client.fetchPRHistory(userId: userId, kind: kind)
+        } catch {
+            lastError = Self.message(for: error)
+            return []
+        }
+    }
+
     /// returns the resulting state so the calling view can update its button
     /// without a full round trip
     @discardableResult

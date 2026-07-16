@@ -186,6 +186,148 @@ struct FeedResponse: Decodable, Sendable {
     let items: [FeedEventDTO]
 }
 
+/// one drive expanded for a feed detail view (`GET /api/rev/drives/{driveId}`)
+public struct DriveDetailDTO: Decodable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let userID: String
+    public let displayName: String
+    public let color: String
+    public let startedAt: Date
+    public let endedAt: Date
+    public let durationSeconds: Double
+    public let tiles: Int
+    public let tilesGained: Int
+    public let tilesCaptured: Int
+    public let distanceMeters: Double
+    /// the cleaned, downsampled route as (lat, lng) pairs
+    public let path: [PathPoint]
+    /// the server-derived per-hex speeds, for the detail map overlay
+    public let tileScores: [TileScore]
+
+    public struct PathPoint: Sendable, Equatable {
+        public let lat: Double
+        public let lng: Double
+
+        public init(lat: Double, lng: Double) {
+            self.lat = lat
+            self.lng = lng
+        }
+    }
+
+    public struct TileScore: Decodable, Sendable, Equatable, Identifiable {
+        public let h3: UInt64
+        public let mph: Double
+
+        public var id: UInt64 { h3 }
+
+        enum CodingKeys: String, CodingKey {
+            case h3, mph
+        }
+
+        public init(h3: UInt64, mph: Double) {
+            self.h3 = h3
+            self.mph = mph
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            // h3 crosses the wire as a decimal string for exactness (2^53 JSON limit)
+            h3 = UInt64(try c.decodeIfPresent(String.self, forKey: .h3) ?? "0") ?? 0
+            mph = try c.decodeIfPresent(Double.self, forKey: .mph) ?? 0
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, color, tiles, path
+        case userID = "user_id"
+        case displayName = "display_name"
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case durationSeconds = "duration_seconds"
+        case tilesGained = "tiles_gained"
+        case tilesCaptured = "tiles_captured"
+        case distanceMeters = "distance_meters"
+        case tileScores = "tile_scores"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        userID = try c.decodeIfPresent(String.self, forKey: .userID) ?? ""
+        displayName = try c.decodeIfPresent(String.self, forKey: .displayName) ?? ""
+        color = try c.decodeIfPresent(String.self, forKey: .color) ?? ""
+        startedAt = SocialDate.parse(try c.decodeIfPresent(String.self, forKey: .startedAt))
+        endedAt = SocialDate.parse(try c.decodeIfPresent(String.self, forKey: .endedAt))
+        durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds) ?? 0
+        tiles = try c.decodeIfPresent(Int.self, forKey: .tiles) ?? 0
+        tilesGained = try c.decodeIfPresent(Int.self, forKey: .tilesGained) ?? 0
+        tilesCaptured = try c.decodeIfPresent(Int.self, forKey: .tilesCaptured) ?? 0
+        distanceMeters = try c.decodeIfPresent(Double.self, forKey: .distanceMeters) ?? 0
+        let pairs = try c.decodeIfPresent([[Double]].self, forKey: .path) ?? []
+        path = pairs.compactMap { $0.count == 2 ? PathPoint(lat: $0[0], lng: $0[1]) : nil }
+        tileScores = (try c.decodeIfPresent([TileScore].self, forKey: .tileScores) ?? []).filter { $0.h3 != 0 }
+    }
+
+    public init(
+        id: String,
+        userID: String,
+        displayName: String,
+        color: String,
+        startedAt: Date,
+        endedAt: Date,
+        durationSeconds: Double,
+        tiles: Int,
+        tilesGained: Int,
+        tilesCaptured: Int,
+        distanceMeters: Double,
+        path: [PathPoint],
+        tileScores: [TileScore] = []
+    ) {
+        self.id = id
+        self.userID = userID
+        self.displayName = displayName
+        self.color = color
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.durationSeconds = durationSeconds
+        self.tiles = tiles
+        self.tilesGained = tilesGained
+        self.tilesCaptured = tilesCaptured
+        self.distanceMeters = distanceMeters
+        self.path = path
+        self.tileScores = tileScores
+    }
+}
+
+/// one moment a personal record was set
+/// (`GET /api/rev/profile/{userId}/prs/{kind}`)
+public struct PRPointDTO: Decodable, Sendable, Equatable, Identifiable {
+    public let occurredAt: Date
+    public let value: Double
+
+    public var id: Date { occurredAt }
+
+    enum CodingKeys: String, CodingKey {
+        case occurredAt = "occurred_at"
+        case value
+    }
+
+    public init(occurredAt: Date, value: Double) {
+        self.occurredAt = occurredAt
+        self.value = value
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        occurredAt = SocialDate.parse(try c.decodeIfPresent(String.self, forKey: .occurredAt))
+        value = try c.decodeIfPresent(Double.self, forKey: .value) ?? 0
+    }
+}
+
+struct PRHistoryResponse: Decodable, Sendable {
+    let items: [PRPointDTO]
+}
+
 /// tolerant parse of a PocketBase datetime string
 enum SocialDate {
     static func parse(_ raw: String?) -> Date {

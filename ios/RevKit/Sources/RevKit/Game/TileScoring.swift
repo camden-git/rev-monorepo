@@ -44,6 +44,10 @@ public enum TileScoring {
     /// chord-shortening through curves
     static let dopplerAgreementSlack = 3.0
 
+    /// fastest (m/s, ~90 mph) a position-only segment may imply. with no Doppler to
+    /// corroborate, anything faster is treated as GPS multipath and skipped
+    static let maxUncorroboratedSpeed = 40.0
+
     public static func perTileScores(for samples: [GPSSample]) -> [UInt64: Double] {
         guard samples.count > 1 else { return [:] }
 
@@ -75,6 +79,16 @@ public enum TileScoring {
                 let tolerance = (max(a.accuracy, 0) + max(b.accuracy, 0)) / dt + dopplerAgreementSlack
                 guard dopplerSpeed <= segmentSpeed + tolerance else { continue }
                 scoreSpeed = dopplerSpeed
+            } else if a.speed >= 0 || b.speed >= 0 {
+                let dopplerSpeed = max(a.speed, b.speed)
+
+                guard dopplerSpeed >= stoppedSpeedMetersPerSecond else { continue }
+                let tolerance = (max(a.accuracy, 0) + max(b.accuracy, 0)) / dt + dopplerAgreementSlack
+                guard dopplerSpeed <= segmentSpeed + tolerance else { continue }
+                scoreSpeed = dopplerSpeed
+            } else {
+                // no Doppler
+                guard segmentSpeed <= maxUncorroboratedSpeed else { continue }
             }
 
             // walk the segment in small steps and attribute each step's distance/time to the tile

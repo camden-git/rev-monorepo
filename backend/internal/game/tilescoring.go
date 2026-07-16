@@ -36,6 +36,10 @@ const (
 	// dopplerAgreementSlack pads the Doppler-vs-position agreement envelope
 	// (m/s) for timestamp jitter and chord-shortening through curves
 	dopplerAgreementSlack = 3.0
+	// maxUncorroboratedSpeed is the fastest (m/s, ~90 mph) a position-only segment
+	// may imply. with no Doppler to corroborate, anything faster is treated as GPS
+	// multipath and skipped
+	maxUncorroboratedSpeed = 40.0
 )
 
 // Cell returns the res-10 cell containing a coordinate
@@ -80,7 +84,8 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 		// filters. fall back to the position-derived speed when Doppler is
 		// unavailable (negative CoreLocation speed = invalid fix).
 		scoreSpeed := segmentSpeed
-		if a.Speed >= 0 && b.Speed >= 0 {
+		switch {
+		case a.Speed >= 0 && b.Speed >= 0:
 			dopplerSpeed := (a.Speed + b.Speed) / 2
 			// position error only ever adds apparent path length, so Doppler
 			// below the position-implied speed is the multipath case Doppler
@@ -93,6 +98,23 @@ func PerTileScores(samples []Sample) map[uint64]float64 {
 				continue
 			}
 			scoreSpeed = dopplerSpeed
+		case a.Speed >= 0 || b.Speed >= 0:
+			// only one endpoint has a Doppler fix; trust it over the positions
+			dopplerSpeed := math.Max(a.Speed, b.Speed)
+			// Doppler says stopped while positions wander: drift, not travel
+			if dopplerSpeed < stoppedSpeedMetersPerSecond {
+				continue
+			}
+			tolerance := (math.Max(a.Accuracy, 0)+math.Max(b.Accuracy, 0))/dt + dopplerAgreementSlack
+			if dopplerSpeed > segmentSpeed+tolerance {
+				continue
+			}
+			scoreSpeed = dopplerSpeed
+		default:
+			// no Doppler; skip a position-only speed too high to trust
+			if segmentSpeed > maxUncorroboratedSpeed {
+				continue
+			}
 		}
 
 		// walk the segment in small steps and attribute each step's distance/time

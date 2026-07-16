@@ -111,6 +111,57 @@ func TestPerTileScoresDropsDopplerGlitchSegments(t *testing.T) {
 	}
 }
 
+// a position-only speed above the ceiling has no Doppler to verify it, so it scores nothing
+func TestPerTileScoresRefusesUncorroboratedHighSpeed(t *testing.T) {
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		samples = append(samples, at(float64(i), 41.8800, -87.6300+0.0006*float64(i)))
+	}
+	if scores := PerTileScores(samples); len(scores) != 0 {
+		t.Fatalf("uncorroborated %d m/s should score nothing, got %v", 50, scores)
+	}
+}
+
+// one valid Doppler endpoint is enough to score the segment
+func TestPerTileScoresUsesSingleEndpointDoppler(t *testing.T) {
+	const trueSpeed = 29.0 // m/s, ~65 mph
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		lng := -87.6300 + 0.00035*float64(i) // ~29 m/s eastward
+		if i%2 == 1 {
+			samples = append(samples, at(float64(i), 41.8800, lng)) // no Doppler
+		} else {
+			samples = append(samples, atSpeed(float64(i), 41.8800, lng, trueSpeed))
+		}
+	}
+	scores := PerTileScores(samples)
+	if len(scores) == 0 {
+		t.Fatal("expected at least one scored tile")
+	}
+	wantMph := trueSpeed * MphPerMetersPerSecond // ~64.9
+	for tile, mph := range scores {
+		if mph < wantMph-4 || mph > wantMph+4 {
+			t.Fatalf("tile %d scored %.1f mph, want ~%.1f from the one valid Doppler endpoint", tile, mph, wantMph)
+		}
+	}
+}
+
+// a valid Doppler zero means stopped, so drifting positions don't score
+func TestPerTileScoresSkipsStoppedDopplerWithDriftingPositions(t *testing.T) {
+	var samples []Sample
+	for i := 0; i < 12; i++ {
+		lng := -87.6300 + 0.00035*float64(i) // positions drift ~29 m/s eastward
+		speed := 0.0                         // valid Doppler: stopped
+		if i%2 == 1 {
+			speed = -1 // no Doppler fix
+		}
+		samples = append(samples, atSpeed(float64(i), 41.8800, lng, speed))
+	}
+	if scores := PerTileScores(samples); len(scores) != 0 {
+		t.Fatalf("stopped-Doppler drift should score nothing, got %v", scores)
+	}
+}
+
 // there is no cap on legitimate speed: when Doppler and the positions agree on a
 // very fast run, it scores at face value
 func TestPerTileScoresKeepsLegitimateHighSpeed(t *testing.T) {

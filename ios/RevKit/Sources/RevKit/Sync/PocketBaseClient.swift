@@ -64,6 +64,14 @@ public protocol PocketBaseClient: Sendable {
     /// `GET /api/rev/feed`
     func fetchFeed() async throws -> [FeedEventDTO]
 
+    /// one drive's stats and downsampled route for a feed detail view
+    /// `GET /api/rev/drives/{driveId}`
+    func fetchDrive(driveId: String) async throws -> DriveDetailDTO
+
+    /// the progression of one personal-record kind for a player
+    /// `GET /api/rev/profile/{userId}/prs/{kind}`
+    func fetchPRHistory(userId: String, kind: String) async throws -> [PRPointDTO]
+
     /// every follow edge the signed-in user is part of, players expanded
     /// `GET /api/collections/follows/records`
     func listFollows() async throws -> [FollowRecordDTO]

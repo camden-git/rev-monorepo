@@ -135,6 +135,12 @@ final class MockPocketBaseClient: PocketBaseClient, @unchecked Sendable {
 
     func fetchFeed() async throws -> [FeedEventDTO] { [] }
 
+    func fetchDrive(driveId: String) async throws -> DriveDetailDTO {
+        throw PocketBaseError.notAuthenticated
+    }
+
+    func fetchPRHistory(userId: String, kind: String) async throws -> [PRPointDTO] { [] }
+
     func listFollows() async throws -> [FollowRecordDTO] { [] }
 
     func createFollow(followerId: String, followeeId: String) async throws -> FollowRecordDTO {

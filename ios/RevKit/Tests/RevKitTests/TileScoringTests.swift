@@ -105,12 +105,57 @@ struct TileScoringTests {
         #expect(scores.keys.allSatisfy { crossed.contains($0) })
     }
 
-    /// da
+    /// a position-only speed above the ceiling has no Doppler to verify it, so it scores nothing
+    @Test func uncorroboratedHighSpeedDoesNotScore() {
+        // ~50 m/s (~111 mph) eastward with no Doppler on any fix
+        let samples = track(steps: 12, lngStep: 0.0006, dt: 1.0)
+        let scores = TileScoring.perTileScores(for: samples)
+        #expect(scores.isEmpty)
+    }
+
+    /// one valid Doppler endpoint is enough to score the segment
+    @Test func singleEndpointDopplerStillScores() {
+        let trueSpeed = 29.0 // m/s, ~65 mph
+        let t0 = Date(timeIntervalSince1970: 0)
+        let samples = (0..<12).map { i in
+            GPSSample(
+                timestamp: t0.addingTimeInterval(Double(i)),
+                lat: base.latitude,
+                lng: base.longitude + 0.00035 * Double(i), // ~29 m/s eastward
+                speed: i % 2 == 1 ? -1 : trueSpeed,
+                accuracy: 5
+            )
+        }
+        let scores = TileScoring.perTileScores(for: samples)
+        #expect(!scores.isEmpty)
+        let wantMph = trueSpeed * TileScoring.mphPerMetersPerSecond // ~64.9
+        for score in scores.values {
+            #expect(abs(score - wantMph) < 4)
+        }
+    }
+
+    /// a valid Doppler zero means stopped, so drifting positions don't score
+    @Test func stoppedDopplerWithDriftingPositionsDoesNotScore() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        let samples = (0..<12).map { i in
+            GPSSample(
+                timestamp: t0.addingTimeInterval(Double(i)),
+                lat: base.latitude,
+                lng: base.longitude + 0.00035 * Double(i), // positions drift ~29 m/s eastward
+                speed: i % 2 == 1 ? -1 : 0, // stopped Doppler alternating with no fix
+                accuracy: 5
+            )
+        }
+        let scores = TileScoring.perTileScores(for: samples)
+        #expect(scores.isEmpty)
+    }
+
+    /// a long segment's travel is attributed across the tiles it crosses
     @Test func longSegmentIsSplitAcrossTilesNotDumpedOnDepartingTile() {
         let t0 = Date(timeIntervalSince1970: 0)
         let samples = [
             GPSSample(timestamp: t0, lat: base.latitude, lng: -87.6300, speed: -1, accuracy: 5),
-            GPSSample(timestamp: t0.addingTimeInterval(5), lat: base.latitude, lng: -87.6270, speed: -1, accuracy: 5),
+            GPSSample(timestamp: t0.addingTimeInterval(7), lat: base.latitude, lng: -87.6270, speed: -1, accuracy: 5),
         ]
         let scores = TileScoring.perTileScores(for: samples)
         #expect(scores.count >= 2) // old behavior would have produced exactly one

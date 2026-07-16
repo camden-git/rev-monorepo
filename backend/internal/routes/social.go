@@ -75,10 +75,21 @@ type statsResponse struct {
 	Items []statPoint `json:"items"`
 }
 
+// prPoint is one moment a personal record was set
+type prPoint struct {
+	OccurredAt string  `json:"occurred_at"`
+	Value      float64 `json:"value"`
+}
+
+type prHistoryResponse struct {
+	Items []prPoint `json:"items"`
+}
+
 func RegisterSocialRoutes(app core.App) {
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		e.Router.GET("/api/rev/profile/{userId}", profile).Bind(apis.RequireAuth("users"))
 		e.Router.GET("/api/rev/profile/{userId}/stats", profileStats).Bind(apis.RequireAuth("users"))
+		e.Router.GET("/api/rev/profile/{userId}/prs/{kind}", profilePRHistory).Bind(apis.RequireAuth("users"))
 		e.Router.GET("/api/rev/feed", feed).Bind(apis.RequireAuth("users"))
 		return e.Next()
 	})
@@ -174,6 +185,43 @@ func profileStats(e *core.RequestEvent) error {
 		})
 	}
 	return e.JSON(http.StatusOK, statsResponse{Items: items})
+}
+
+// profilePRHistory returns a player's PR moments of one kind, oldest first, for
+// charting the record's progression
+func profilePRHistory(e *core.RequestEvent) error {
+	if e.Auth == nil {
+		return e.UnauthorizedError("Sign in required.", nil)
+	}
+	viewerID := e.Auth.Id
+	targetID := e.Request.PathValue("userId")
+
+	target, err := e.App.FindRecordById("users", targetID)
+	if err != nil {
+		return e.NotFoundError("Player not found.", err)
+	}
+	if viewerID != targetID && target.GetBool("is_private") && followStatus(e.App, viewerID, targetID) != "accepted" {
+		return e.ForbiddenError("This player's records are private.", nil)
+	}
+
+	recs, err := e.App.FindRecordsByFilter(
+		"feed_events",
+		"actor = {:u} && type = 'pr' && subtype = {:k}",
+		"occurred_at",
+		0, 0,
+		dbx.Params{"u": targetID, "k": e.Request.PathValue("kind")},
+	)
+	if err != nil {
+		return e.InternalServerError("Failed to load record history.", err)
+	}
+	items := make([]prPoint, 0, len(recs))
+	for _, r := range recs {
+		items = append(items, prPoint{
+			OccurredAt: r.GetString("occurred_at"),
+			Value:      r.GetFloat("value"),
+		})
+	}
+	return e.JSON(http.StatusOK, prHistoryResponse{Items: items})
 }
 
 func feed(e *core.RequestEvent) error {

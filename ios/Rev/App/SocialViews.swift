@@ -90,13 +90,7 @@ struct ActivityFeedView: View {
             } else {
                 ForEach(social.feed) { item in
                     NavigationLink {
-                        PlayerProfileView(
-                            store: store,
-                            social: social,
-                            userId: item.userID,
-                            fallbackName: item.displayName,
-                            fallbackColor: item.color
-                        )
+                        FeedEventDetailView(store: store, social: social, event: item)
                     } label: {
                         FeedEventRow(event: item)
                     }
@@ -375,7 +369,8 @@ struct FeedEventRow: View {
     }
 }
 
-private struct FeedEventPresentation {
+/// shared glyph/tint/copy for one feed moment, used by the row and its detail view
+struct FeedEventPresentation {
     let glyph: String
     let tint: Color
     let message: String

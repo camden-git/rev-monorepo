@@ -16,6 +16,10 @@ struct HomeDrawer: View {
     @State private var showSocial = false
     @State private var showSessionRecovery = false
     @State private var selectedDrive: DriveRecord?
+    @State private var leaderboardCache: [TerritoryStore.LeaderboardEntry] = []
+    @State private var empireStatsCache = EmpireStats()
+    @State private var driveHistoryCache: [DriveRecord] = []
+    @State private var driveStreakCache = DriveStreak(current: 0, longest: 0)
 
     var body: some View {
         NavigationStack {
@@ -40,6 +44,15 @@ struct HomeDrawer: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationDragIndicator(.visible)
             }
+        }
+        .task(id: store.tilesVersion) {
+            // tiles churn every few seconds mid-drive while the carousels are hidden;
+            // the lastDriveSummary refresh below covers drive end
+            guard !tracker.isRecording else { return }
+            refreshDrawerCaches()
+        }
+        .onChange(of: tracker.lastDriveSummary) { _, _ in
+            refreshDrawerCaches()
         }
     }
 
@@ -120,7 +133,7 @@ struct HomeDrawer: View {
                     summary: summary,
                     store: store,
                     newRecords: tracker.lastDrivePRs,
-                    streak: store.driveStreak(),
+                    streak: driveStreakCache,
                     drivePath: tracker.lastDrivePath
                 ) { showSummary = false }
                     .presentationDetents([.medium, .large])
@@ -239,9 +252,9 @@ struct HomeDrawer: View {
     // MARK: leaderboard carousel
 
     private var leaderboardSection: some View {
-        let board = store.leaderboard()
+        let board = leaderboardCache
         let rank = board.firstIndex { $0.isLocal }.map { $0 + 1 }
-        let stats = empireStats()
+        let stats = empireStatsCache
 
         return VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Leaderboard") {
@@ -316,7 +329,7 @@ struct HomeDrawer: View {
     // MARK: past drives carousel
 
     private var pastDrivesSection: some View {
-        let drives = store.driveHistory()
+        let drives = driveHistoryCache
 
         return VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Past Drives") {
@@ -405,13 +418,16 @@ struct HomeDrawer: View {
 
     // MARK: derived data
 
-    private func empireStats() -> EmpireStats {
+    private func refreshDrawerCaches() {
         let drives = store.driveHistory()
-        return EmpireStats.compute(
+        driveHistoryCache = drives
+        leaderboardCache = store.leaderboard()
+        empireStatsCache = EmpireStats.compute(
             tiles: Array(store.tiles.values),
             ownedBy: store.localPlayer.id,
             driveSummaries: drives.compactMap(\.summary)
         )
+        driveStreakCache = DriveStreak.compute(driveDates: drives.map(\.startedAt))
     }
 
     private var contestedText: String {
@@ -428,7 +444,7 @@ struct HomeDrawer: View {
     }
 
     private func elapsedText(asOf now: Date) -> String {
-        guard let start = tracker.currentDrive?.startedAt else { return "0:00" }
+        guard let start = tracker.driveStartedAt else { return "0:00" }
         let total = max(0, Int(now.timeIntervalSince(start)))
         return String(format: "%d:%02d", total / 60, total % 60)
     }

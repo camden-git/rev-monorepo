@@ -23,6 +23,9 @@ struct RootView: View {
     @State private var drawerDetent: PresentationDetent = .height(150)
     /// the hex inspector sheet, non-nil while a tapped tile is shown
     @State private var selectedTile: HexTileDetail?
+    /// one-time "weak GPS limits top speed" card
+    @AppStorage("hasSeenAccuracyLimitNotice") private var hasSeenAccuracyLimitNotice = false
+    @State private var showAccuracyNotice = false
     @State private var toastTask: Task<Void, Never>?
     @State private var visibleTileSyncTask: Task<Void, Never>?
 
@@ -60,6 +63,8 @@ struct RootView: View {
         }
         .environment(push)
         .task {
+            // new installs don't need the explainer
+            if store.needsOnboarding { hasSeenAccuracyLimitNotice = true }
             configurePush()
             await sync.checkVersionGate()
             await sync.restoreSessionIfPossible()
@@ -110,6 +115,9 @@ struct RootView: View {
     }
 
     private func reconcileRealtime() {
+        // .inactive is transient (shade, control center, calls); don't tear down
+        // the stream just to reconnect a moment later
+        if scenePhase == .inactive && sync.isSignedIn { return }
         if scenePhase == .active && sync.isSignedIn {
             sync.startRealtime()
             // catches a token revoked server-side while idle or backgrounded, which
@@ -125,7 +133,8 @@ struct RootView: View {
     private var mapContent: some View {
         HexMapView(
             store: store,
-            breadcrumb: tracker.drivePathSegments,
+            tilesVersion: store.tilesVersion,
+            breadcrumb: tracker.breadcrumbSegments,
             onVisibleCellsChange: { cells in scheduleVisibleTileSync(cells) },
             onSelectTile: { tile in selectedTile = tile }
         )
@@ -140,7 +149,16 @@ struct RootView: View {
                 }
                 tracker.start()
             }
-            .onAppear { showDrawer = true }
+            .onAppear {
+                showDrawer = true
+                if !hasSeenAccuracyLimitNotice {
+                    // let the drawer present first so the notice stacks above it
+                    Task {
+                        try? await Task.sleep(for: .seconds(0.6))
+                        showAccuracyNotice = true
+                    }
+                }
+            }
             .onChange(of: tracker.isRecording) { _, recording in
                 // collapse to the compact trip readout when a drive starts
                 if recording { drawerDetent = .height(150) }
@@ -164,6 +182,10 @@ struct RootView: View {
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled()
+                    .sheet(isPresented: $showAccuracyNotice, onDismiss: { hasSeenAccuracyLimitNotice = true }) {
+                        // the notice sizes its own detent
+                        AccuracyLimitNoticeView { showAccuracyNotice = false }
+                    }
             }
     }
 

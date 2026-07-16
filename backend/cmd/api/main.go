@@ -43,6 +43,7 @@ func main() {
 	routes.RegisterTileRoutes(app, notifier)
 	routes.RegisterAccountRoutes(app)
 	routes.RegisterSocialRoutes(app)
+	routes.RegisterDriveRoutes(app)
 	routes.RegisterDeviceRoutes(app)
 	hooks.RegisterExpiryCron(app)
 	stats.RegisterSnapshotCron(app)

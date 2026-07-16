@@ -40,15 +40,16 @@ public final class AutoStartPreferences {
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        // default every activity on until the user explicitly stores a choice
-        func load(_ activity: Activity) -> Bool {
+        // driving and cycling default on; walking/running default off so a daily
+        // walk doesn't run navigation-grade GPS unless the user opts in
+        func load(_ activity: Activity, default fallback: Bool) -> Bool {
             let key = Self.keyPrefix + activity.rawValue
-            return defaults.object(forKey: key) == nil ? true : defaults.bool(forKey: key)
+            return defaults.object(forKey: key) == nil ? fallback : defaults.bool(forKey: key)
         }
-        walking = load(.walking)
-        running = load(.running)
-        cycling = load(.cycling)
-        automotive = load(.automotive)
+        walking = load(.walking, default: false)
+        running = load(.running, default: false)
+        cycling = load(.cycling, default: true)
+        automotive = load(.automotive, default: true)
     }
 
     public func isEnabled(_ activity: Activity) -> Bool {

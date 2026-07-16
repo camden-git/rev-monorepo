@@ -25,6 +25,7 @@
 		A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FDC10F6072E934167CD1D7 /* ColorHex.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* ScoringExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* ScoringExplainerView.swift */; };
 		A1C3D4E5F6070819203A4B6C /* UpdateRequiredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C3D4E5F6070819203A4B6D /* UpdateRequiredView.swift */; };
+		A1F3E7C2D94B5A08E6172F30 /* FeedEventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E4F8D3EA5C6B19F7283A41 /* FeedEventDetailView.swift */; };
 		B1B3B3DF4CE62CE68F89D002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B1B3B3DF4CE62CE68F89D001 /* PrivacyInfo.xcprivacy */; };
 		BB5899A14A53771AB31DEE89 /* RevKit in Frameworks */ = {isa = PBXBuildFile; productRef = D9B7B4275284769A91EF50C5 /* RevKit */; };
 		BD993042EE13D451121A04CD /* PlayerAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAAA7BEA98A99E528E994DA7 /* PlayerAvatar.swift */; };
@@ -57,6 +58,7 @@
 		A612DB066C3D529986584A8B /* RevApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevApp.swift; sourceTree = "<group>"; };
 		AC0673B770485F7009C4E40F /* ViewStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewStyles.swift; sourceTree = "<group>"; };
 		B1B3B3DF4CE62CE68F89D001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B2E4F8D3EA5C6B19F7283A41 /* FeedEventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedEventDetailView.swift; sourceTree = "<group>"; };
 		D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDrawer.swift; sourceTree = "<group>"; };
 		E9485FD72FD3DC9100975FC1 /* chicago-loop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-loop.gpx"; path = "../scripts/chicago-loop.gpx"; sourceTree = "<group>"; };
 		E9485FD82FD3E94F00975FC1 /* chicago-drive.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "chicago-drive.gpx"; path = "../scripts/chicago-drive.gpx"; sourceTree = "<group>"; };
@@ -110,6 +112,7 @@
 				5581F52012A4971B7DF1565F /* AppleSignInButton.swift */,
 				14FDC10F6072E934167CD1D7 /* ColorHex.swift */,
 				10849F8A99B2FA27FA632C14 /* DriveHistoryView.swift */,
+				B2E4F8D3EA5C6B19F7283A41 /* FeedEventDetailView.swift */,
 				2CC7C26388624657DEC54AA1 /* DriveSummaryView.swift */,
 				D0C697CE8BB20B00DCF991CF /* HomeDrawer.swift */,
 				40C0F969107087F96013E67F /* LeaderboardView.swift */,
@@ -218,6 +221,7 @@
 				750F9185B65529585FBA4B91 /* AppleSignInButton.swift in Sources */,
 				A1A1FDD4DEE57AD8D0295622 /* ColorHex.swift in Sources */,
 				39C766231BFD1B1F1BC2BA09 /* DriveHistoryView.swift in Sources */,
+				A1F3E7C2D94B5A08E6172F30 /* FeedEventDetailView.swift in Sources */,
 				9DB481CF7D7CCCCE854ED4E4 /* DriveSummaryView.swift in Sources */,
 				FE6E01FCDAFF5997C0C16BE8 /* HomeDrawer.swift in Sources */,
 				50A65F1593C4D85C05336D0F /* LeaderboardView.swift in Sources */,
@@ -378,7 +382,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;
@@ -409,7 +413,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = Rev/Rev.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Rev/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rev;

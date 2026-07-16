@@ -26,6 +26,8 @@ public final class SyncService {
     /// live tile push, nil in tests that don't exercise realtime
     private let realtime: TileRealtimeClient?
     private var realtimeActive = false
+    /// last realtime reconnect backfill; reconnects inside the window skip the poll
+    private var lastRealtimeBackfill: Date = .distantPast
     /// periodic session-liveness check, see `startHeartbeat`
     private var heartbeatTask: Task<Void, Never>?
 
@@ -287,8 +289,13 @@ public final class SyncService {
         realtimeActive = true
         realtime.start(
             onConnect: { [weak self] in
-                // backfill anything missed while disconnected via the delta-poll
-                Task { @MainActor in await self?.pollTiles() }
+                // backfill missed tiles via the delta-poll, but skip it when a flapping
+                // stream reconnects repeatedly
+                Task { @MainActor in
+                    guard let self, Date().timeIntervalSince(self.lastRealtimeBackfill) >= 30 else { return }
+                    self.lastRealtimeBackfill = Date()
+                    await self.pollTiles()
+                }
             },
             onTile: { [weak self] dto in
                 self?.store.applyRemoteTiles([dto])
@@ -335,7 +342,7 @@ public final class SyncService {
     /// server-side is caught even when the user is idle (no map pan, no drive). the
     /// realtime stream cannot surface this: a dead token degrades to a guest
     /// subscription that silently receives nothing.
-    public func startHeartbeat(interval: Duration = .seconds(60)) {
+    public func startHeartbeat(interval: Duration = .seconds(300)) {
         guard currentUserId != nil, heartbeatTask == nil else { return }
         heartbeatTask = Task { [weak self] in
             // verify straight away so a session revoked while backgrounded is caught

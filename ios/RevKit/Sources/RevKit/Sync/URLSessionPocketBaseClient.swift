@@ -147,6 +147,16 @@ public final class URLSessionPocketBaseClient: PocketBaseClient {
         return try await send(request, decoding: FeedResponse.self).items
     }
 
+    public func fetchDrive(driveId: String) async throws -> DriveDetailDTO {
+        let request = try makeRequest(path: "/api/rev/drives/\(driveId)", method: "GET", authed: true)
+        return try await send(request, decoding: DriveDetailDTO.self)
+    }
+
+    public func fetchPRHistory(userId: String, kind: String) async throws -> [PRPointDTO] {
+        let request = try makeRequest(path: "/api/rev/profile/\(userId)/prs/\(kind)", method: "GET", authed: true)
+        return try await send(request, decoding: PRHistoryResponse.self).items
+    }
+
     public func listFollows() async throws -> [FollowRecordDTO] {
         let query = [
             URLQueryItem(name: "perPage", value: "200"),

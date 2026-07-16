@@ -130,9 +130,85 @@ struct ScoringExplainerView: View {
     }
 }
 
+/// one-time card explaining that weak GPS limits top speed until reception improves
+struct AccuracyLimitNoticeView: View {
+    var onDone: () -> Void = {}
+
+    @State private var contentHeight: CGFloat = 480
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(.tint)
+                    Text("Speed scoring got smarter")
+                        .font(.title2.weight(.bold))
+                    Text("Rev now double-checks every tile's speed against your iPhone's motion reading, so glitchy GPS can't record speeds you never drove.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    noticePoint(
+                        icon: "gauge.with.needle",
+                        title: "Weak signal limits top speed",
+                        body: "When your phone can't verify a speed — in a pocket, a bag, or between tall buildings — anything above 90 mph won't score until reception improves."
+                    )
+                    noticePoint(
+                        icon: "iphone.gen3",
+                        title: "Keep your phone in the open",
+                        body: "A mount, dashboard, or seat gives the clearest signal and the most accurate scoring."
+                    )
+                }
+
+                Button(action: onDone) {
+                    Text("Got It")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+            }
+            .padding(24)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents([.height(contentHeight)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func noticePoint(icon: String, title: String, body: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(body)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
 #Preview {
     Color.gray.sheet(isPresented: .constant(true)) {
         ScoringExplainerView()
             .presentationDetents([.large])
+    }
+}
+
+#Preview("Accuracy notice") {
+    Color.gray.sheet(isPresented: .constant(true)) {
+        AccuracyLimitNoticeView()
+            .presentationDetents([.medium])
     }
 }

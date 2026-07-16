@@ -131,6 +131,22 @@ struct RealtimeSyncTests {
         #expect(client.listSinceArgs.isEmpty == false)
     }
 
+    @Test func rapidReconnectSkipsRedundantBackfill() async throws {
+        let store = makeStore()
+        let client = MockPocketBaseClient()
+        let realtime = MockTileRealtimeClient()
+        let sync = makeSync(store: store, client: client, realtime: realtime)
+        sync.adoptSession(AuthResponse(token: "t", record: AuthUserDTO(id: "me", email: nil, displayName: nil)))
+        sync.startRealtime()
+
+        realtime.simulateConnect()
+        try await waitUntil { client.listSinceArgs.count == 1 }
+
+        realtime.simulateConnect() // flapping stream: reconnect inside the backfill window
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(client.listSinceArgs.count == 1)
+    }
+
     @Test func signOutStopsRealtimeStream() async throws {
         let realtime = MockTileRealtimeClient()
         let sync = makeSync(store: makeStore(), client: MockPocketBaseClient(), realtime: realtime)

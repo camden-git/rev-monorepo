@@ -55,17 +55,20 @@ public struct HexTileDetail: Identifiable, Equatable, Sendable {
 /// MapKit map with the H3 res-10 grid overlay
 public struct HexMapView: UIViewRepresentable {
     private let store: TerritoryStore
+    private let tilesVersion: Int
     private let breadcrumb: [[CLLocationCoordinate2D]]
     private let onVisibleCellsChange: @MainActor (Set<UInt64>) -> Void
     private let onSelectTile: @MainActor (HexTileDetail) -> Void
 
     public init(
         store: TerritoryStore,
+        tilesVersion: Int = 0,
         breadcrumb: [[CLLocationCoordinate2D]] = [],
         onVisibleCellsChange: @escaping @MainActor (Set<UInt64>) -> Void = { _ in },
         onSelectTile: @escaping @MainActor (HexTileDetail) -> Void = { _ in }
     ) {
         self.store = store
+        self.tilesVersion = tilesVersion
         self.breadcrumb = breadcrumb
         self.onVisibleCellsChange = onVisibleCellsChange
         self.onSelectTile = onSelectTile
@@ -110,8 +113,8 @@ public struct HexMapView: UIViewRepresentable {
     }
 
     public func updateUIView(_ mapView: MKMapView, context: Context) {
-        context.coordinator.updateVisibleCells(for: mapView)
-        context.coordinator.syncClaimedOverlay()
+        context.coordinator.updateVisibleCellsIfNeeded(for: mapView)
+        context.coordinator.syncClaimedOverlay(tilesVersion: tilesVersion)
         context.coordinator.syncBreadcrumb(breadcrumb)
     }
 
@@ -130,11 +133,15 @@ public struct HexMapView: UIViewRepresentable {
         private var claimOutlineColors: [ObjectIdentifier: UIColor] = [:]
         private var visibleSyncCells: Set<UInt64> = []
         private var visibleClaimCells: Set<UInt64> = []
+        private var visibleClaimCellsTilesVersion: Int?
         /// the local player's home hex, rendered distinctly (it's the trail-closure anchor)
         private var homeOverlay: MKPolygon?
         private var breadcrumbOverlays: [MKPolyline] = []
         private var breadcrumbCount = 0
         private var claimedOverlaySignature: ClaimedOverlaySignature?
+        private var claimedOverlayInputs: ClaimedOverlayInputs?
+        private var lastVisibleRegionSignature: MapRegionSignature?
+        private var cachedStrengthScale: StrengthScaleCache?
         private var didCenterOnUser = false
         private var rebuildItem: DispatchWorkItem?
 
@@ -160,12 +167,28 @@ public struct HexMapView: UIViewRepresentable {
         /// actually crosses a band
         private static let fillBandCount = 6
 
-        private func strengthScaleCeil(now: Date) -> Double {
+        @MainActor
+        private func strengthScaleCeil(tilesVersion: Int, now: Date) -> Double {
+            let bucket = Self.decayBucket(for: now)
+            if let cachedStrengthScale,
+               cachedStrengthScale.tilesVersion == tilesVersion,
+               cachedStrengthScale.decayBucket == bucket {
+                return cachedStrengthScale.ceil
+            }
             var ceil = Self.minStrengthScale
             for cell in store.tiles.keys {
                 if let s = store.effectiveScore(of: cell, now: now), s > ceil { ceil = s }
             }
+            cachedStrengthScale = StrengthScaleCache(
+                tilesVersion: tilesVersion,
+                decayBucket: bucket,
+                ceil: ceil
+            )
             return ceil
+        }
+
+        private static func decayBucket(for date: Date) -> Int {
+            Int(date.timeIntervalSinceReferenceDate / 60)
         }
 
         private static func fillBand(forStrength strength: Double, ceil: Double) -> Int {
@@ -193,9 +216,25 @@ public struct HexMapView: UIViewRepresentable {
         }
 
         @MainActor
-        func syncClaimedOverlay() {
+        func syncClaimedOverlay(tilesVersion: Int) {
             guard let mapView else { return }
-            let signature = makeClaimedOverlaySignature(for: mapView)
+            refreshVisibleClaimCellsForTileChangeIfNeeded(in: mapView, tilesVersion: tilesVersion)
+            let now = Date()
+            let strokeBand = strokeWidthBand(for: mapView)
+            let inputs = ClaimedOverlayInputs(
+                tilesVersion: tilesVersion,
+                decayBucket: Self.decayBucket(for: now),
+                strokeWidthBand: strokeBand
+            )
+            guard inputs != claimedOverlayInputs else { return }
+            let ceil = strengthScaleCeil(tilesVersion: tilesVersion, now: now)
+            let signature = makeClaimedOverlaySignature(
+                for: mapView,
+                strokeWidthBand: strokeBand,
+                strengthCeil: ceil,
+                now: now
+            )
+            claimedOverlayInputs = inputs
             guard signature != claimedOverlaySignature else { return }
             claimedOverlaySignature = signature
 
@@ -208,14 +247,13 @@ public struct HexMapView: UIViewRepresentable {
             claimOutlineOverlays.removeAll()
             claimOutlineColors.removeAll()
             let cellsByOwner = visibleClaimCellsByOwner()
-            let ceil = strengthScaleCeil(now: .now)
             for player in store.players {
                 guard let cells = cellsByOwner[player.id], !cells.isEmpty,
                       let color = UIColor(hex: player.colorHex) else { continue }
 
                 var cellsByBand: [Int: Set<UInt64>] = [:]
                 for cell in cells {
-                    let strength = store.effectiveScore(of: cell) ?? 0
+                    let strength = store.effectiveScore(of: cell, now: now) ?? 0
                     cellsByBand[Self.fillBand(forStrength: strength, ceil: ceil), default: []].insert(cell)
                 }
 
@@ -245,13 +283,21 @@ public struct HexMapView: UIViewRepresentable {
             }
         }
 
-        private func makeClaimedOverlaySignature(for mapView: MKMapView) -> ClaimedOverlaySignature {
+        @MainActor
+        private func makeClaimedOverlaySignature(
+            for mapView: MKMapView,
+            strokeWidthBand: Int,
+            strengthCeil: Double,
+            now: Date
+        ) -> ClaimedOverlaySignature {
             var visibleOwners: [UInt64: String] = [:]
             visibleOwners.reserveCapacity(Swift.min(visibleClaimCells.count, store.tiles.count))
-            let ceil = strengthScaleCeil(now: .now)
             for cell in visibleClaimCells {
                 if let ownerId = store.tiles[cell]?.ownerId {
-                    let band = Self.fillBand(forStrength: store.effectiveScore(of: cell) ?? 0, ceil: ceil)
+                    let band = Self.fillBand(
+                        forStrength: store.effectiveScore(of: cell, now: now) ?? 0,
+                        ceil: strengthCeil
+                    )
                     visibleOwners[cell] = "\(ownerId)#\(band)"
                 }
             }
@@ -265,7 +311,7 @@ public struct HexMapView: UIViewRepresentable {
                 visibleOwners: visibleOwners,
                 playerColors: playerColors,
                 localHomeCell: store.localPlayer.homeCell,
-                strokeWidthBand: strokeWidthBand(for: mapView)
+                strokeWidthBand: strokeWidthBand
             )
         }
 
@@ -311,6 +357,7 @@ public struct HexMapView: UIViewRepresentable {
             return Swift.min(maximum, Swift.max(minimum, hexEdgeScreenPoints * fraction))
         }
 
+        @MainActor
         private func visibleClaimCellsByOwner() -> [String: Set<UInt64>] {
             var cellsByOwner: [String: Set<UInt64>] = [:]
             cellsByOwner.reserveCapacity(store.players.count)
@@ -341,7 +388,20 @@ public struct HexMapView: UIViewRepresentable {
         }
 
         @MainActor
+        func updateVisibleCellsIfNeeded(for mapView: MKMapView) {
+            let signature = MapRegionSignature(mapView: mapView)
+            guard signature != lastVisibleRegionSignature else { return }
+            updateVisibleCells(for: mapView, signature: signature)
+        }
+
+        @MainActor
         func updateVisibleCells(for mapView: MKMapView) {
+            updateVisibleCells(for: mapView, signature: MapRegionSignature(mapView: mapView))
+        }
+
+        @MainActor
+        private func updateVisibleCells(for mapView: MKMapView, signature: MapRegionSignature) {
+            lastVisibleRegionSignature = signature
             let syncCells = H3Grid.visibleCellIds(for: mapView.region)
             if syncCells != visibleSyncCells {
                 visibleSyncCells = syncCells
@@ -359,7 +419,22 @@ public struct HexMapView: UIViewRepresentable {
                 : syncCells
             guard claimCells != visibleClaimCells else { return }
             visibleClaimCells = claimCells
-            syncClaimedOverlay()
+            visibleClaimCellsTilesVersion = nil
+            claimedOverlayInputs = nil
+            syncClaimedOverlay(tilesVersion: store.tilesVersion)
+        }
+
+        @MainActor
+        private func refreshVisibleClaimCellsForTileChangeIfNeeded(in mapView: MKMapView, tilesVersion: Int) {
+            guard visibleSyncCells.isEmpty, visibleClaimCellsTilesVersion != tilesVersion else { return }
+            let claimCells = H3Grid.visibleClaimedCellIds(
+                in: mapView.visibleMapRect,
+                from: store.tiles.keys
+            )
+            visibleClaimCellsTilesVersion = tilesVersion
+            guard claimCells != visibleClaimCells else { return }
+            visibleClaimCells = claimCells
+            claimedOverlayInputs = nil
         }
 
         public func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
@@ -471,6 +546,42 @@ public struct HexMapView: UIViewRepresentable {
             var playerColors: [String: String]
             var localHomeCell: UInt64
             var strokeWidthBand: Int
+        }
+
+        private struct ClaimedOverlayInputs: Equatable {
+            var tilesVersion: Int
+            var decayBucket: Int
+            var strokeWidthBand: Int
+        }
+
+        private struct StrengthScaleCache {
+            var tilesVersion: Int
+            var decayBucket: Int
+            var ceil: Double
+        }
+
+        private struct MapRegionSignature: Equatable {
+            var centerLat: Int
+            var centerLng: Int
+            var spanLat: Int
+            var spanLng: Int
+            var width: Int
+            var height: Int
+
+            @MainActor
+            init(mapView: MKMapView) {
+                let region = mapView.region
+                centerLat = Self.quantize(region.center.latitude)
+                centerLng = Self.quantize(region.center.longitude)
+                spanLat = Self.quantize(region.span.latitudeDelta)
+                spanLng = Self.quantize(region.span.longitudeDelta)
+                width = Int(mapView.bounds.width.rounded())
+                height = Int(mapView.bounds.height.rounded())
+            }
+
+            private static func quantize(_ value: CLLocationDegrees) -> Int {
+                Int((value * 1_000_000).rounded())
+            }
         }
     }
 }

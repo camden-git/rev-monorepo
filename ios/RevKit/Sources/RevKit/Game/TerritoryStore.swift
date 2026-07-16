@@ -20,8 +20,10 @@ public final class TerritoryStore {
 
     /// h3 cell -> current state, for both claim resolution and the per-player overlays
     public private(set) var tiles: [UInt64: ClaimResolver.TileState] = [:]
+    public private(set) var tilesVersion = 0
     @ObservationIgnored private var tileRecords: [UInt64: TileRecord] = [:]
     @ObservationIgnored private var pendingSaveTask: Task<Void, Never>?
+    @ObservationIgnored public var saveDebounce: Duration = .milliseconds(300)
 
     /// true until the local player has chosen a home hex (`homeH3 == 0`)
     public private(set) var needsOnboarding: Bool
@@ -115,93 +117,55 @@ public final class TerritoryStore {
         now: Date = .now
     ) -> ClaimResolver.ClaimOutcome {
         let claimant = ownerId ?? localPlayer.id
-        let current = tiles[cellIndex]
-        let currentRef = current?.refSpeed ?? Strength.referenceSpeedPrior
-        let strength = Strength.strength(speedMph: speedMph, refSpeed: currentRef)
-        let nextRef = Strength.updateReference(refSpeed: currentRef, speedMph: speedMph)
-        let nextObs = (current?.obsCount ?? 0) + 1
-
-        // claim floor
-        guard strength >= Strength.claimFloor else {
-            if let current {
-                upsert(
-                    cellIndex,
-                    ownerId: current.ownerId,
-                    score: current.claimScore,
-                    refSpeed: nextRef,
-                    obsCount: nextObs,
-                    captures: current.captures,
-                    drivenSpeed: current.drivenSpeed,
-                    isHome: current.isHome,
-                    now: current.lastDrivenAt
-                )
-            }
-            return .noChange
-        }
-
-        let outcome = ClaimResolver.resolve(
-            current: current,
-            claimantId: claimant,
-            incomingScore: strength,
-            now: now
+        let resolved = resolveSpeedClaim(
+            cellIndex,
+            speedMph: speedMph,
+            claimant: claimant,
+            now: now,
+            current: tiles[cellIndex]
         )
-
-        switch outcome {
-        case .noChange:
-            if let current {
-                // only the reference/obs learning step changed
-                upsert(
-                    cellIndex,
-                    ownerId: current.ownerId,
-                    score: current.claimScore,
-                    refSpeed: nextRef,
-                    obsCount: nextObs,
-                    captures: current.captures,
-                    drivenSpeed: current.drivenSpeed,
-                    isHome: current.isHome,
-                    now: current.lastDrivenAt
-                )
-            }
-        case let .created(newScore):
-            upsert(
-                cellIndex,
-                ownerId: claimant,
-                score: newScore,
-                refSpeed: nextRef,
-                obsCount: nextObs,
-                captures: 0,
-                drivenSpeed: speedMph,
-                isHome: false,
-                now: now
-            )
-        case let .reinforced(newScore):
-            // re-drive floor: record this drive's speed only when it set the new floor
-            let drove = strength >= (current?.claimScore ?? 0) ? speedMph : (current?.drivenSpeed ?? 0)
-            upsert(
-                cellIndex,
-                ownerId: claimant,
-                score: newScore,
-                refSpeed: nextRef,
-                obsCount: nextObs,
-                captures: current?.captures ?? 0,
-                drivenSpeed: drove,
-                isHome: current?.isHome ?? false,
-                now: now
-            )
-        case let .captured(newScore):
-            upsert(
-                cellIndex,
-                ownerId: claimant,
-                score: newScore,
-                refSpeed: nextRef,
-                obsCount: nextObs,
-                captures: (current?.captures ?? 0) + 1,
-                drivenSpeed: speedMph,
-                isHome: false,
-                now: now
-            )
+        if let state = resolved.state {
+            setTileState(state, for: cellIndex)
         }
-        return outcome
+        return resolved.outcome
+    }
+
+    /// batch form of `claimSpeed` for live rescoring: mutates the tile cache once
+    /// per tick, not once per scored tile
+    @discardableResult
+    public func claimSpeeds(
+        _ scores: [UInt64: Double],
+        by ownerId: String? = nil,
+        now: Date = .now
+    ) -> [UInt64: ClaimResolver.ClaimOutcome] {
+        let claimant = ownerId ?? localPlayer.id
+        var nextTiles = tiles
+        var outcomes: [UInt64: ClaimResolver.ClaimOutcome] = [:]
+        var changed = false
+
+        for (cellIndex, speedMph) in scores {
+            let resolved = resolveSpeedClaim(
+                cellIndex,
+                speedMph: speedMph,
+                claimant: claimant,
+                now: now,
+                current: nextTiles[cellIndex]
+            )
+            outcomes[cellIndex] = resolved.outcome
+            guard let state = resolved.state else { continue }
+            persistTileState(state, for: cellIndex)
+            if nextTiles[cellIndex] != state {
+                nextTiles[cellIndex] = state
+                changed = true
+            }
+        }
+
+        if changed {
+            tiles = nextTiles
+            bumpTilesVersion()
+            scheduleSave()
+        }
+        return outcomes
     }
 
     // MARK: server sync
@@ -242,6 +206,7 @@ public final class TerritoryStore {
         }
         tileRecords[cell] = nil
         tiles[cell] = nil
+        bumpTilesVersion()
         scheduleSave()
     }
 
@@ -249,13 +214,16 @@ public final class TerritoryStore {
     public func reconcileTiles(authoritative remote: [TileDTO]) {
         let live = Set(remote.map(\.h3))
         let stale = tiles.keys.filter { !live.contains($0) }
+        var removedStale = false
         for cell in stale {
             if let record = tileRecords[cell] {
                 context.delete(record)
             }
             tileRecords[cell] = nil
             tiles[cell] = nil
+            removedStale = true
         }
+        if removedStale { bumpTilesVersion() }
         applyRemoteTiles(remote)
         saveImmediately()
     }
@@ -283,8 +251,10 @@ public final class TerritoryStore {
         }
 
         // re-point the in-memory cache
+        var nextTiles = tiles
+        var changedTiles = false
         for (cell, state) in tiles where state.ownerId == oldId {
-            tiles[cell] = ClaimResolver.TileState(
+            nextTiles[cell] = ClaimResolver.TileState(
                 ownerId: serverId,
                 claimScore: state.claimScore,
                 refSpeed: state.refSpeed,
@@ -294,6 +264,11 @@ public final class TerritoryStore {
                 lastDrivenAt: state.lastDrivenAt,
                 isHome: state.isHome
             )
+            changedTiles = true
+        }
+        if changedTiles {
+            tiles = nextTiles
+            bumpTilesVersion()
         }
 
         localPlayer.id = serverId
@@ -389,6 +364,7 @@ public final class TerritoryStore {
         context.insert(fresh)
 
         tiles = [:]
+        bumpTilesVersion()
         tileRecords = [:]
         players = [fresh]
         localPlayer = fresh
@@ -446,7 +422,7 @@ public final class TerritoryStore {
             context.insert(record)
             tileRecords[cellIndex] = record
         }
-        tiles[cellIndex] = ClaimResolver.TileState(
+        let state = ClaimResolver.TileState(
             ownerId: ownerId,
             claimScore: score,
             refSpeed: refSpeed,
@@ -456,7 +432,153 @@ public final class TerritoryStore {
             lastDrivenAt: now,
             isHome: isHome
         )
+        tiles[cellIndex] = state
+        bumpTilesVersion()
         scheduleSave()
+    }
+
+    private struct SpeedClaimResolution {
+        var outcome: ClaimResolver.ClaimOutcome
+        var state: ClaimResolver.TileState?
+    }
+
+    private func resolveSpeedClaim(
+        _ cellIndex: UInt64,
+        speedMph: Double,
+        claimant: String,
+        now: Date,
+        current: ClaimResolver.TileState?
+    ) -> SpeedClaimResolution {
+        let currentRef = current?.refSpeed ?? Strength.referenceSpeedPrior
+        let strength = Strength.strength(speedMph: speedMph, refSpeed: currentRef)
+        let nextRef = Strength.updateReference(refSpeed: currentRef, speedMph: speedMph)
+        let nextObs = (current?.obsCount ?? 0) + 1
+
+        // claim floor
+        guard strength >= Strength.claimFloor else {
+            guard let current else { return SpeedClaimResolution(outcome: .noChange, state: nil) }
+            return SpeedClaimResolution(
+                outcome: .noChange,
+                state: ClaimResolver.TileState(
+                    ownerId: current.ownerId,
+                    claimScore: current.claimScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: current.captures,
+                    drivenSpeed: current.drivenSpeed,
+                    lastDrivenAt: current.lastDrivenAt,
+                    isHome: current.isHome
+                )
+            )
+        }
+
+        let outcome = ClaimResolver.resolve(
+            current: current,
+            claimantId: claimant,
+            incomingScore: strength,
+            now: now
+        )
+
+        switch outcome {
+        case .noChange:
+            guard let current else { return SpeedClaimResolution(outcome: outcome, state: nil) }
+            // only the reference/obs learning step changed
+            return SpeedClaimResolution(
+                outcome: outcome,
+                state: ClaimResolver.TileState(
+                    ownerId: current.ownerId,
+                    claimScore: current.claimScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: current.captures,
+                    drivenSpeed: current.drivenSpeed,
+                    lastDrivenAt: current.lastDrivenAt,
+                    isHome: current.isHome
+                )
+            )
+        case let .created(newScore):
+            return SpeedClaimResolution(
+                outcome: outcome,
+                state: ClaimResolver.TileState(
+                    ownerId: claimant,
+                    claimScore: newScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: 0,
+                    drivenSpeed: speedMph,
+                    lastDrivenAt: now,
+                    isHome: false
+                )
+            )
+        case let .reinforced(newScore):
+            // re-drive floor: record this drive's speed only when it set the new floor
+            let drove = strength >= (current?.claimScore ?? 0) ? speedMph : (current?.drivenSpeed ?? 0)
+            return SpeedClaimResolution(
+                outcome: outcome,
+                state: ClaimResolver.TileState(
+                    ownerId: claimant,
+                    claimScore: newScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: current?.captures ?? 0,
+                    drivenSpeed: drove,
+                    lastDrivenAt: now,
+                    isHome: current?.isHome ?? false
+                )
+            )
+        case let .captured(newScore):
+            return SpeedClaimResolution(
+                outcome: outcome,
+                state: ClaimResolver.TileState(
+                    ownerId: claimant,
+                    claimScore: newScore,
+                    refSpeed: nextRef,
+                    obsCount: nextObs,
+                    captures: (current?.captures ?? 0) + 1,
+                    drivenSpeed: speedMph,
+                    lastDrivenAt: now,
+                    isHome: false
+                )
+            )
+        }
+    }
+
+    private func persistTileState(_ state: ClaimResolver.TileState, for cellIndex: UInt64) {
+        if let record = tileRecords[cellIndex] {
+            record.ownerId = state.ownerId
+            record.claimScore = state.claimScore
+            record.refSpeed = state.refSpeed
+            record.obsCount = state.obsCount
+            record.captures = state.captures
+            record.drivenSpeed = state.drivenSpeed
+            record.lastDrivenAt = state.lastDrivenAt
+            record.isHome = state.isHome
+        } else {
+            let record = TileRecord(
+                h3: cellIndex,
+                ownerId: state.ownerId,
+                claimScore: state.claimScore,
+                refSpeed: state.refSpeed,
+                obsCount: state.obsCount,
+                captures: state.captures,
+                drivenSpeed: state.drivenSpeed,
+                lastDrivenAt: state.lastDrivenAt,
+                isHome: state.isHome
+            )
+            context.insert(record)
+            tileRecords[cellIndex] = record
+        }
+    }
+
+    private func setTileState(_ state: ClaimResolver.TileState, for cellIndex: UInt64) {
+        persistTileState(state, for: cellIndex)
+        tiles[cellIndex] = state
+        bumpTilesVersion()
+        scheduleSave()
+    }
+
+    private func bumpTilesVersion() {
+        tilesVersion &+= 1
     }
 
     /// persist a finished drive (with its provisional summary) so it survives relaunch and is ready
@@ -470,9 +592,10 @@ public final class TerritoryStore {
     }
 
     private func scheduleSave() {
+        let delay = saveDebounce
         pendingSaveTask?.cancel()
         pendingSaveTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled, let self else { return }
             pendingSaveTask = nil
             try? context.save()

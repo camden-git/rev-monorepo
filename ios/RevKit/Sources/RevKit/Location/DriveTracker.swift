@@ -10,7 +10,8 @@ import Observation
 ///   1. default - significant-location-change monitoring (coarse, ~zero battery)
 ///   2. motion detected via CoreMotion (automotive/cycling/walking/running) pass to
 ///      `kCLLocationAccuracyBestForNavigation` at ~1 Hz and begin a `Drive`
-///   3. stationary > 60s -> drop back to significant-change and end the drive
+///   3. stationary past the grace period (60s automotive, 15s otherwise) -> drop back to
+///      significant-change and end the drive
 ///
 /// a manual `startDrive()` / `endDrive()` override exists because `CMMotionActivityManager` is
 /// unavailable in the Simulator
@@ -42,16 +43,15 @@ public final class DriveTracker {
     }
 
     public var drivePathSegments: [[CLLocationCoordinate2D]] {
-        TileScoring.segmentedPath(currentDrive?.rawPath ?? [])
+        breadcrumbSegments
     }
 
+    /// throttled live breadcrumb shown on the map
+    public private(set) var breadcrumbSegments: [[CLLocationCoordinate2D]] = []
+    /// drive start, exposed so the HUD timer doesn't observe rawPath
+    public private(set) var driveStartedAt: Date?
     /// live count of tiles gained this drive
-    public var claimsThisDrive: Int {
-        let me = store.localPlayer.id
-        return beforeOwners.reduce(0) { count, entry in
-            store.tiles[entry.key]?.ownerId == me && entry.value != me ? count + 1 : count
-        }
-    }
+    public private(set) var claimsThisDrive = 0
 
     /// live distance driven this drive (meters), using the same moving-segment filter as scoring.
     /// cached and refreshed on each (throttled) live rescore + at finalize, so the HUD reading it
@@ -61,33 +61,38 @@ public final class DriveTracker {
     /// which motion types are allowed to auto-start a drive
     public let autoStart: AutoStartPreferences
 
-    private let store: TerritoryStore
-    private let locationManager = CLLocationManager()
-    private let activityManager = CMMotionActivityManager()
-    private let delegate = LocationDelegate()
+    @ObservationIgnored private let store: TerritoryStore
+    @ObservationIgnored private let locationManager = CLLocationManager()
+    @ObservationIgnored private let activityManager = CMMotionActivityManager()
+    @ObservationIgnored private let delegate = LocationDelegate()
 
-    private var isMoving = false
-    private var stationaryDropTask: Task<Void, Never>?
+    @ObservationIgnored private var isMoving = false
+    @ObservationIgnored private var stationaryDropTask: Task<Void, Never>?
 
     /// set when the user manually ends a drive while still in motion
-    private var autoStartSuppressed = false
+    @ObservationIgnored private var autoStartSuppressed = false
 
     /// live enclosure-closure tracking, reset per drive
-    private var visitedTiles: Set<UInt64> = []
-    private var ownedAtDriveStart: Set<UInt64> = []
-    private var hasLeftOwned = false
-    private var lastTile: UInt64?
+    @ObservationIgnored private var visitedTiles: Set<UInt64> = []
+    @ObservationIgnored private var ownedAtDriveStart: Set<UInt64> = []
+    @ObservationIgnored private var hasLeftOwned = false
+    @ObservationIgnored private var lastTile: UInt64?
+    @ObservationIgnored private var claimedTileThisVisit: UInt64?
 
     /// per-drive net-diff accounting, reset per drive
     /// owner of each touched cell when the drive first claimed it (nil value = was unowned)
-    private var beforeOwners: [UInt64: String?] = [:]
+    @ObservationIgnored private var beforeOwners: [UInt64: String?] = [:]
+    @ObservationIgnored private var claimedThisDriveCells: Set<UInt64> = []
     /// cells gained as enclosed interior this drive
-    private var enclosedCells: Set<UInt64> = []
-    /// how long activity must read stationary before we drop back to significant-change
-    private let stationaryGrace: Duration = .seconds(60)
+    @ObservationIgnored private var enclosedCells: Set<UInt64> = []
+    /// whether the current drive has seen automotive motion; picks the stationary grace
+    @ObservationIgnored private var driveIsAutomotive = false
+    /// how long stationary before dropping back to significant-change. automotive gets a
+    /// long grace for traffic lights; foot and bike end fast to spare GPS
+    private var stationaryGrace: Duration { driveIsAutomotive ? .seconds(60) : .seconds(15) }
 
     /// timestamp of the last live full-path rescore
-    private var lastLiveRescore: Date = .distantPast
+    @ObservationIgnored private var lastLiveRescore: Date = .distantPast
     private let liveRescoreInterval: TimeInterval = 3
 
     /// invoked on the throttled live rescore with the raw GPS samples recorded
@@ -95,7 +100,7 @@ public final class DriveTracker {
     /// resolves, and broadcasts the resulting captures to others mid-drive
     public var onLiveClaims: (([GPSSample]) -> Void)?
     /// count of rawPath samples already streamed, so each tick sends only the new tail
-    private var liveFlushedSampleCount = 0
+    @ObservationIgnored private var liveFlushedSampleCount = 0
 
     public init(store: TerritoryStore, autoStart: AutoStartPreferences = AutoStartPreferences()) {
         self.store = store
@@ -104,7 +109,8 @@ public final class DriveTracker {
         delegate.tracker = self
         locationManager.delegate = delegate
         locationManager.activityType = .automotiveNavigation
-        locationManager.pausesLocationUpdatesAutomatically = false
+        // let the OS pause GPS during long stops
+        locationManager.pausesLocationUpdatesAutomatically = true
     }
 
     // MARK: lifecycle
@@ -122,6 +128,7 @@ public final class DriveTracker {
     public func startDrive() {
         autoStartSuppressed = false // opting back in
         beginDriveIfNeeded()
+        driveIsAutomotive = true
         escalateAccuracy()
     }
 
@@ -162,6 +169,7 @@ public final class DriveTracker {
             if !isMoving { isMoving = true }
             guard !autoStartSuppressed, autoStartAllowed else { return }
             beginDriveIfNeeded()
+            if active.contains(.automotive) { driveIsAutomotive = true }
             escalateAccuracy()
         } else if stationary, isMoving, stationaryDropTask == nil {
             stationaryDropTask = Task { @MainActor [weak self] in
@@ -185,12 +193,19 @@ public final class DriveTracker {
         locationManager.distanceFilter = kCLDistanceFilterNone
         if backgroundUpdatesPermitted {
             locationManager.allowsBackgroundLocationUpdates = true
+            locationManager.showsBackgroundLocationIndicator = true
         }
         locationManager.startUpdatingLocation()
     }
 
     private func deescalateAccuracy() {
         locationManager.stopUpdatingLocation()
+        // drop background and navigation-grade settings so an idle restart can't
+        // run at full power
+        locationManager.allowsBackgroundLocationUpdates = false
+        locationManager.showsBackgroundLocationIndicator = false
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.distanceFilter = 250
         if CLLocationManager.significantLocationChangeMonitoringAvailable() {
             locationManager.startMonitoringSignificantLocationChanges()
         }
@@ -208,19 +223,26 @@ public final class DriveTracker {
 
     private func beginDriveIfNeeded() {
         guard currentDrive == nil else { return }
-        currentDrive = Drive(startedAt: Date())
+        let drive = Drive(startedAt: Date())
+        currentDrive = drive
         isRecording = true
+        store.saveDebounce = .seconds(10)
         visitedTiles = []
         ownedAtDriveStart = store.claimedCells
         hasLeftOwned = false
         lastTile = nil
+        claimedTileThisVisit = nil
         beforeOwners = [:]
+        claimedThisDriveCells = []
+        claimsThisDrive = 0
         enclosedCells = []
         contestedOwnerName = nil
         contestedScore = nil
         lastDriveSummary = nil
         lastDrivePath = []
         lastDrivePRs = []
+        breadcrumbSegments = []
+        driveStartedAt = drive.startedAt
         driveDistanceMeters = 0
         lastLiveRescore = .distantPast
         liveFlushedSampleCount = 0
@@ -234,7 +256,21 @@ public final class DriveTracker {
         }
     }
 
-    fileprivate func ingest(_ locations: [CLLocation]) {
+    private func recordLocalGainIfNeeded(_ cell: UInt64, outcome: ClaimResolver.ClaimOutcome) {
+        guard outcome != .noChange else { return }
+        let me = store.localPlayer.id
+        guard beforeOwners[cell] != me,
+              store.tiles[cell]?.ownerId == me,
+              claimedThisDriveCells.insert(cell).inserted
+        else { return }
+        claimsThisDrive = claimedThisDriveCells.count
+    }
+
+    private func refreshBreadcrumbSegments() {
+        breadcrumbSegments = TileScoring.segmentedPath(currentDrive?.rawPath ?? [])
+    }
+
+    func ingest(_ locations: [CLLocation]) {
         guard currentDrive != nil else { return }
         for location in locations {
             // negative speedAccuracy means the Doppler speed is invalid, but the
@@ -254,6 +290,7 @@ public final class DriveTracker {
             // trail), mirroring the server which silently refuses to create them
             if let tile = TileScoring.cell(lat: sample.lat, lng: sample.lng), Geofence.containsCell(tile) {
                 if tile != lastTile {
+                    claimedTileThisVisit = nil
                     let ownedAtStart = ownedAtDriveStart.contains(tile)
                     // closing the loop = touching a cell we've already crossed this drive, or
                     // reentering territory we owned when the drive began
@@ -270,8 +307,12 @@ public final class DriveTracker {
                 // claim floor
                 let ref = store.tiles[tile]?.refSpeed ?? Strength.referenceSpeedPrior
                 if Strength.strength(speedMph: currentSpeedMph, refSpeed: ref) >= Strength.claimFloor {
-                    recordBeforeOwner(tile)
-                    store.claim(tile)
+                    if claimedTileThisVisit != tile {
+                        recordBeforeOwner(tile)
+                        let outcome = store.claim(tile)
+                        recordLocalGainIfNeeded(tile, outcome: outcome)
+                        claimedTileThisVisit = tile
+                    }
                 }
             }
         }
@@ -281,6 +322,7 @@ public final class DriveTracker {
         if now.timeIntervalSince(lastLiveRescore) >= liveRescoreInterval {
             lastLiveRescore = now
             applyPerTileScores() // local optimistic HUD; the server re-scores authoritatively
+            refreshBreadcrumbSegments()
             flushLiveClaims()
         }
     }
@@ -308,9 +350,13 @@ public final class DriveTracker {
         guard let drive = currentDrive else { return [:] }
         let cleanedPath = cleaned ?? GPSOutlierFilter.filterOutliers(drive.rawPath)
         let scores = TileScoring.perTileScores(for: cleanedPath)
-        for (tile, score) in scores where Geofence.containsCell(tile) {
+        let localScores = scores.filter { Geofence.containsCell($0.key) }
+        for tile in localScores.keys {
             recordBeforeOwner(tile)
-            store.claimSpeed(tile, speedMph: score)
+        }
+        let outcomes = store.claimSpeeds(localScores)
+        for (tile, outcome) in outcomes {
+            recordLocalGainIfNeeded(tile, outcome: outcome)
         }
         driveDistanceMeters = TileScoring.movementStats(for: cleanedPath).distanceMeters
         return scores
@@ -342,7 +388,8 @@ public final class DriveTracker {
         for (tile, score) in enclosed.scoredInterior where score > 0 && tile != home && Geofence.containsCell(tile) {
             recordBeforeOwner(tile)
             enclosedCells.insert(tile)
-            store.claim(tile, score: score, now: now)
+            let outcome = store.claim(tile, score: score, now: now)
+            recordLocalGainIfNeeded(tile, outcome: outcome)
         }
     }
 
@@ -358,6 +405,7 @@ public final class DriveTracker {
         let summary = buildSummary(perTileScores: finalScores, cleaned: cleaned)
         lastDriveSummary = summary
         lastDrivePath = cleaned.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+        breadcrumbSegments = []
 
         let prior = store.driveHistory().compactMap(\.summary)
         lastDrivePRs = DrivePRs.newRecords(for: summary, against: prior)
@@ -367,9 +415,12 @@ public final class DriveTracker {
         store.record(drive, summary: summary)
         currentDrive = nil
         isRecording = false
+        store.saveDebounce = .milliseconds(300)
+        driveIsAutomotive = false
         currentSpeedMph = 0
         contestedOwnerName = nil
         contestedScore = nil
+        driveStartedAt = nil
     }
 
     /// diff the drive's net per-tile ownership change into a `DriveSummary` (REF:
